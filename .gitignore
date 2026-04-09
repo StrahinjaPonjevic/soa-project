@@ -1,0 +1,21 @@
+# Visual Studio
+.vs/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# .NET artifacts
+*.rsuser
+*.cache
+*.pdb
