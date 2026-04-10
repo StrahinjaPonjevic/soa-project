@@ -2,6 +2,7 @@
 using AuthService.Data;
 using AuthService.DTOs;
 using AuthService.Models;
+using AuthService.Services;
 
 namespace AuthService.Controllers;
 
@@ -10,20 +11,20 @@ namespace AuthService.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IJwtService _jwtService;
 
-    public AuthController(AppDbContext context)
+    public AuthController(AppDbContext context, IJwtService jwtService)
     {
         _context = context;
+        _jwtService = jwtService;
     }
 
     [HttpPost("register")]
     public IActionResult Register(RegisterDto dto)
     {
-        // VALIDACIJA ROLE
         if (dto.Role != "Guide" && dto.Role != "Tourist")
             return BadRequest("Invalid role");
 
-        // PROVERA DA LI POSTOJI USERNAME
         if (_context.Users.Any(u => u.Username == dto.Username))
             return BadRequest("Username already exists");
 
@@ -39,5 +40,18 @@ public class AuthController : ControllerBase
         _context.SaveChanges();
 
         return Ok("User created");
+    }
+
+    [HttpPost("login")]
+    public IActionResult Login(LoginDto dto)
+    {
+        var user = _context.Users.FirstOrDefault(u => u.Username == dto.Username);
+
+        if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            return Unauthorized("Invalid credentials");
+
+        var token = _jwtService.GenerateToken(user);
+
+        return Ok(new { token });
     }
 }
