@@ -51,6 +51,9 @@ public class AuthController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized("Invalid credentials");
 
+        if (user.IsBlocked)
+            return Unauthorized("User account is blocked");
+
         var token = _jwtService.GenerateToken(user);
 
         return Ok(new { token });
@@ -72,5 +75,47 @@ public class AuthController : ControllerBase
             .ToList();
 
         return Ok(users);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("users/{id}/block")]
+    public IActionResult BlockUser(int id)
+    {
+        return SetUserBlockedStatus(id, true);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("users/{id}/unblock")]
+    public IActionResult UnblockUser(int id)
+    {
+        return SetUserBlockedStatus(id, false);
+    }
+
+    private IActionResult SetUserBlockedStatus(int id, bool isBlocked)
+    {
+        var user = _context.Users.FirstOrDefault(u => u.Id == id);
+
+        if (user == null)
+            return NotFound("User not found");
+
+        if (user.Role != "Guide" && user.Role != "Tourist")
+            return BadRequest("Only Guide and Tourist accounts can be blocked or unblocked");
+
+        user.IsBlocked = isBlocked;
+        _context.SaveChanges();
+
+        return Ok(ToUserResponseDto(user));
+    }
+
+    private static UserResponseDto ToUserResponseDto(User user)
+    {
+        return new UserResponseDto
+        {
+            Id = user.Id,
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role,
+            IsBlocked = user.IsBlocked
+        };
     }
 }
