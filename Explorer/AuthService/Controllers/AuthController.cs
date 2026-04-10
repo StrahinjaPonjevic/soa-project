@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using AuthService.Data;
 using AuthService.DTOs;
 using AuthService.Models;
@@ -53,5 +54,23 @@ public class AuthController : ControllerBase
         var token = _jwtService.GenerateToken(user);
 
         return Ok(new { token });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet("users")]
+    public IActionResult GetUsers()
+    {
+        var users = _context.Users
+            .Select(user => new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                Role = user.Role,
+                IsBlocked = user.IsBlocked
+            })
+            .ToList();
+
+        return Ok(users);
     }
 }
