@@ -1,6 +1,15 @@
 @BlogService_HostAddress = http://localhost:5078
 
-GET {{BlogService_HostAddress}}/weatherforecast/
+POST {{BlogService_HostAddress}}/api/blogs
+Content-Type: application/json
 Accept: application/json
+
+{
+  "title": "Moj prvi blog",
+  "descriptionMarkdown": "# Uvod\nOvo je **markdown** opis.",
+  "imageUrls": [
+    "https://example.com/slika1.jpg"
+  ]
+}
 
 ###
