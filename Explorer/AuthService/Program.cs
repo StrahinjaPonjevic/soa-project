@@ -1,4 +1,4 @@
-using AuthService.Data;
+﻿using AuthService.Data;
 using AuthService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -37,9 +37,11 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// ── Baza ──────────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
+// ── JWT ───────────────────────────────────────────────────────────────────────
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key nije konfigurisan");
 
@@ -55,25 +57,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
-builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddHttpClient<IStakeholdersClient, StakeholdersClient>(client =>
-{
-    client.BaseAddress = new Uri(
-        builder.Configuration["StakeholdersService:BaseUrl"]
-        ?? throw new InvalidOperationException("StakeholdersService:BaseUrl nije konfigurisan"));
 
-    client.DefaultRequestHeaders.Add(
-        "X-Internal-Api-Key",
-        builder.Configuration["StakeholdersService:InternalApiKey"]
-        ?? throw new InvalidOperationException("StakeholdersService:InternalApiKey nije konfigurisan"));
-})
-.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+builder.Services.AddScoped<IJwtService, JwtService>();
+
+// ── RabbitMQ Publisher — async factory registracija ───────────────────────────
+// AddSingleton sa async factory — kreira se jednom pri prvom zahtevu
+builder.Services.AddSingleton<IMessagePublisher>(sp =>
 {
-    // Samo za development � IIS Express koristi self-signed sertifikat
-    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    var config = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<RabbitMqPublisher>>();
+    return RabbitMqPublisher.CreateAsync(config, logger).GetAwaiter().GetResult();
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -81,7 +83,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

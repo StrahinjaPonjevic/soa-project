@@ -1,0 +1,134 @@
+version: '3.8'
+
+# Svi servisi su u istoj mreži — mogu se zvati po imenu (npr. "rabbitmq", "auth_db")
+# Klijentska aplikacija (Angular/React) pristupa servisima preko eksponovanih portova na hostu
+
+services:
+
+  # ── Baze podataka ────────────────────────────────────────────────────────────
+
+  auth_db:
+    image: postgres:16-alpine
+    container_name: auth_db
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5433:5432"   # host:kontejner — 5433 da ne bi konfliktovao sa lokalnim Postgresom
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  stakeholders_db:
+    image: postgres:16-alpine
+    container_name: stakeholders_db
+    environment:
+      POSTGRES_DB: stakeholders_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5434:5432"
+    volumes:
+      - stakeholders_db_data:/var/lib/postgresql/data
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+        RABBITMQ_DEFAULT_USER: user
+        RABBITMQ_DEFAULT_PASS: pass
+    ports:
+      - "5672:5672"    # AMQP port — servisi se konektuju ovde
+      - "15672:15672"  # Management UI — otvori http://localhost:15672 u browseru
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Aplikativni servisi ───────────────────────────────────────────────────────
+
+  auth_service:
+    build:
+      context: ./AuthService      # folder u kome se nalazi Dockerfile.auth
+      dockerfile: Dockerfile.auth
+    container_name: auth_service
+    environment:
+      # Environment varijable pregazuju appsettings.json
+      # Format: Sekcija__Kljuc (dvostruki underscore = dvotačka)
+      - ConnectionStrings__Default=Host=auth_db;Port=5432;Database=auth_db;Username=postgres;Password=root
+      - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
+      - Jwt__Issuer=auth-service
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=user
+      - RabbitMQ__Password=pass
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5001:8080"   # klijent pristupa Auth servisu na localhost:5001
+    depends_on:
+      auth_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - explorer_network
+    restart: on-failure
+
+  stakeholders_service:
+    build:
+      context: ./StakeholdersService
+      dockerfile: Dockerfile.stakeholders
+    container_name: stakeholders_service
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=stakeholders_db;Port=5432;Database=stakeholders_db;Username=postgres;Password=root
+      - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
+      - InternalApiKey=rkNyFb4xkrM1N3fiy7louwHeeo0V90PQ
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=user
+      - RabbitMQ__Password=pass
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5002:8080"   # klijent pristupa Stakeholders servisu na localhost:5002
+    depends_on:
+      stakeholders_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - explorer_network
+    restart: on-failure
+
+# ── Volumes — perzistentni podaci preživljavaju docker-compose down ───────────
+volumes:
+  auth_db_data:
+  stakeholders_db_data:
+  rabbitmq_data:
+
+# ── Mreža — svi servisi komuniciraju interno po imenu kontejnera ──────────────
+networks:
+  explorer_network:
+    driver: bridge

@@ -1,0 +1,24 @@
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Kopiramo samo .csproj prvo — iskorišćavamo Docker layer cache
+# Ako se .csproj ne promeni, dotnet restore se neće ponavljati
+COPY AuthService.csproj .
+RUN dotnet restore
+
+# Kopiramo ostatak koda i buildujemo
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+# Koristimo manji runtime image, ne SDK
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+# Port na kome servis sluša unutar kontejnera
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "AuthService.dll"]

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+ï»¿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuthService.Data;
 using AuthService.DTOs;
@@ -13,20 +13,20 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IJwtService _jwtService;
-    private readonly IStakeholdersClient _stakeholdersClient; // NOVO
+    private readonly IMessagePublisher _publisher;
 
     public AuthController(
         AppDbContext context,
         IJwtService jwtService,
-        IStakeholdersClient stakeholdersClient) // NOVO
+        IMessagePublisher publisher)
     {
         _context = context;
         _jwtService = jwtService;
-        _stakeholdersClient = stakeholdersClient;
+        _publisher = publisher;
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterDto dto) // NOVO: async
+    public async Task<IActionResult> Register(RegisterDto dto)
     {
         if (dto.Role != "Guide" && dto.Role != "Tourist")
             return BadRequest("Invalid role");
@@ -45,15 +45,12 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         _context.SaveChanges();
 
-        // Nakon što sa?uvamo korisnika i dobijemo njegov Id,
-        // obaveštavamo Stakeholders servis da kreira prazan profil.
-        // Fire-and-forget uz logovanje — registracija ne pada ako Stakeholders nije dostupan.
-        await _stakeholdersClient.InitializeProfileAsync(user.Id); // NOVO
+        // Objavljujemo event â€” Auth ne Äeka Stakeholders, ne zna za njega
+        await _publisher.PublishUserRegisteredAsync(user.Id);
 
         return Ok("User created");
     }
 
-    // Ostali endpointi ostaju nepromenjeni
     [HttpPost("login")]
     public IActionResult Login(LoginDto dto)
     {
@@ -96,8 +93,7 @@ public class AuthController : ControllerBase
     private IActionResult SetUserBlockedStatus(int id, bool isBlocked)
     {
         var user = _context.Users.FirstOrDefault(u => u.Id == id);
-        if (user == null)
-            return NotFound("User not found");
+        if (user == null) return NotFound("User not found");
 
         if (user.Role != "Guide" && user.Role != "Tourist")
             return BadRequest("Only Guide and Tourist accounts can be blocked or unblocked");
