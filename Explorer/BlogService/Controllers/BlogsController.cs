@@ -1,8 +1,10 @@
 using BlogService.Data;
 using BlogService.DTOs;
 using BlogService.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace BlogService.Controllers;
 
@@ -39,9 +41,20 @@ public class BlogsController : ControllerBase
         return Ok(ToResponse(blog));
     }
 
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<BlogResponseDto>> Create([FromBody] CreateBlogDto dto)
     {
+        var userIdClaim = User.FindFirst("userId")?.Value;
+        var username = User.FindFirst(ClaimTypes.Name)?.Value; 
+
+        if (string.IsNullOrWhiteSpace(userIdClaim) || 
+            !int.TryParse(userIdClaim, out var userId) || 
+            string.IsNullOrWhiteSpace(username))
+        {
+            return Unauthorized("Missing user claims in token."); 
+        }
+
         var invalidImage = dto.ImageUrls?.FirstOrDefault(url =>
             !Uri.IsWellFormedUriString(url, UriKind.Absolute));
 
@@ -54,6 +67,8 @@ public class BlogsController : ControllerBase
         {
             Title = dto.Title.Trim(),
             DescriptionMarkdown = dto.DescriptionMarkdown,
+            AuthorId = userId,
+            AuthorUsername = username,
             CreatedAtUtc = DateTime.UtcNow,
             ImageUrls = dto.ImageUrls
         };
@@ -71,6 +86,8 @@ public class BlogsController : ControllerBase
             Id = blog.Id,
             Title = blog.Title,
             DescriptionMarkdown = blog.DescriptionMarkdown,
+            AuthorId = blog.AuthorId,
+            AuthorUsername = blog.AuthorUsername,
             CreatedAtUtc = blog.CreatedAtUtc,
             ImageUrls = blog.ImageUrls
         };

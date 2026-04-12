@@ -20,6 +20,8 @@ namespace BlogService.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Title = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
                     DescriptionMarkdown = table.Column<string>(type: "text", nullable: false),
+                    AuthorId = table.Column<int>(type: "integer", nullable: false),
+                    AuthorUsername = table.Column<string>(type: "text", nullable: false),
                     CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ImageUrls = table.Column<string[]>(type: "text[]", nullable: true)
                 },

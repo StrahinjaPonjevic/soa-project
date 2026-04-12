@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlogService.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260411135630_InitBlog")]
+    [Migration("20260412144547_InitBlog")]
     partial class InitBlog
     {
         /// <inheritdoc />
@@ -32,6 +32,13 @@ namespace BlogService.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AuthorUsername")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
