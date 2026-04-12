@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuthService.Data;
 using AuthService.DTOs;
@@ -13,15 +13,20 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IJwtService _jwtService;
+    private readonly IMessagePublisher _publisher;
 
-    public AuthController(AppDbContext context, IJwtService jwtService)
+    public AuthController(
+        AppDbContext context,
+        IJwtService jwtService,
+        IMessagePublisher publisher)
     {
         _context = context;
         _jwtService = jwtService;
+        _publisher = publisher;
     }
 
     [HttpPost("register")]
-    public IActionResult Register(RegisterDto dto)
+    public async Task<IActionResult> Register(RegisterDto dto)
     {
         if (dto.Role != "Guide" && dto.Role != "Tourist")
             return BadRequest("Invalid role");
@@ -40,6 +45,9 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         _context.SaveChanges();
 
+        // Objavljujemo event — Auth ne čeka Stakeholders, ne zna za njega
+        await _publisher.PublishUserRegisteredAsync(user.Id);
+
         return Ok("User created");
     }
 
@@ -47,7 +55,6 @@ public class AuthController : ControllerBase
     public IActionResult Login(LoginDto dto)
     {
         var user = _context.Users.FirstOrDefault(u => u.Username == dto.Username);
-
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized("Invalid credentials");
 
@@ -55,7 +62,6 @@ public class AuthController : ControllerBase
             return Unauthorized("User account is blocked");
 
         var token = _jwtService.GenerateToken(user);
-
         return Ok(new { token });
     }
 
@@ -73,49 +79,36 @@ public class AuthController : ControllerBase
                 IsBlocked = user.IsBlocked
             })
             .ToList();
-
         return Ok(users);
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPatch("users/{id}/block")]
-    public IActionResult BlockUser(int id)
-    {
-        return SetUserBlockedStatus(id, true);
-    }
+    public IActionResult BlockUser(int id) => SetUserBlockedStatus(id, true);
 
     [Authorize(Roles = "Admin")]
     [HttpPatch("users/{id}/unblock")]
-    public IActionResult UnblockUser(int id)
-    {
-        return SetUserBlockedStatus(id, false);
-    }
+    public IActionResult UnblockUser(int id) => SetUserBlockedStatus(id, false);
 
     private IActionResult SetUserBlockedStatus(int id, bool isBlocked)
     {
         var user = _context.Users.FirstOrDefault(u => u.Id == id);
-
-        if (user == null)
-            return NotFound("User not found");
+        if (user == null) return NotFound("User not found");
 
         if (user.Role != "Guide" && user.Role != "Tourist")
             return BadRequest("Only Guide and Tourist accounts can be blocked or unblocked");
 
         user.IsBlocked = isBlocked;
         _context.SaveChanges();
-
         return Ok(ToUserResponseDto(user));
     }
 
-    private static UserResponseDto ToUserResponseDto(User user)
+    private static UserResponseDto ToUserResponseDto(User user) => new()
     {
-        return new UserResponseDto
-        {
-            Id = user.Id,
-            Username = user.Username,
-            Email = user.Email,
-            Role = user.Role,
-            IsBlocked = user.IsBlocked
-        };
-    }
+        Id = user.Id,
+        Username = user.Username,
+        Email = user.Email,
+        Role = user.Role,
+        IsBlocked = user.IsBlocked
+    };
 }
