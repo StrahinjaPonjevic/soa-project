@@ -1,4 +1,6 @@
 using BlogService.Data;
+using BlogService.Repositories;
+using BlogService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -10,6 +12,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddScoped<IBlogRepository, BlogRepository>();
+builder.Services.AddScoped<IBlogService, BlogAppService>();
+builder.Services.AddScoped<ICommentService, CommentService>();
+builder.Services.AddScoped<ILikeService, LikeService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]!;
 

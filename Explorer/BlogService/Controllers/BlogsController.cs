@@ -1,10 +1,7 @@
-using BlogService.Data;
 using BlogService.DTOs;
-using BlogService.Models;
+using BlogService.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace BlogService.Controllers;
 
@@ -12,84 +9,146 @@ namespace BlogService.Controllers;
 [Route("api/blogs")]
 public class BlogsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IBlogService _blogService;
+    private readonly ICommentService _commentService;
+    private readonly ILikeService _likeService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public BlogsController(AppDbContext context)
+    public BlogsController(
+        IBlogService blogService,
+        ICommentService commentService,
+        ILikeService likeService,
+        ICurrentUserService currentUserService)
     {
-        _context = context;
+        _blogService = blogService;
+        _commentService = commentService;
+        _likeService = likeService;
+        _currentUserService = currentUserService;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BlogResponseDto>>> GetAll()
     {
-        var blogs = await _context.Blogs
-            .OrderByDescending(b => b.CreatedAtUtc)
-            .Select(b => ToResponse(b))
-            .ToListAsync();
-        return Ok(blogs); 
+        var blogs = await _blogService.GetAllAsync();
+        return Ok(blogs);
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<BlogResponseDto>> GetById(int id)
     {
-        var blog = await _context.Blogs.FirstOrDefaultAsync(b => b.Id == id);
+        var blog = await _blogService.GetByIdAsync(id);
         if (blog == null)
         {
             return NotFound();
         }
 
-        return Ok(ToResponse(blog));
+        return Ok(blog);
     }
 
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<BlogResponseDto>> Create([FromBody] CreateBlogDto dto)
     {
-        var userIdClaim = User.FindFirst("userId")?.Value;
-        var username = User.FindFirst(ClaimTypes.Name)?.Value; 
-
-        if (string.IsNullOrWhiteSpace(userIdClaim) || 
-            !int.TryParse(userIdClaim, out var userId) || 
-            string.IsNullOrWhiteSpace(username))
+        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
         {
-            return Unauthorized("Missing user claims in token."); 
+            return Unauthorized("Missing user claims in token.");
         }
 
-        var invalidImage = dto.ImageUrls?.FirstOrDefault(url =>
-            !Uri.IsWellFormedUriString(url, UriKind.Absolute));
-
-        if (invalidImage is not null)
+        try
         {
-            return BadRequest("All image URLs must be absolute URLs.");
+            var created = await _blogService.CreateAsync(dto, currentUser!);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
-
-        var blog = new Blog
+        catch (ArgumentException ex)
         {
-            Title = dto.Title.Trim(),
-            DescriptionMarkdown = dto.DescriptionMarkdown,
-            AuthorId = userId,
-            AuthorUsername = username,
-            CreatedAtUtc = DateTime.UtcNow,
-            ImageUrls = dto.ImageUrls
-        };
-
-        _context.Blogs.Add(blog);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = blog.Id }, ToResponse(blog));
+            return BadRequest(ex.Message);
+        }
     }
 
-    private static BlogResponseDto ToResponse(Blog blog)
+    [Authorize]
+    [HttpPost("{blogId:int}/comments")]
+    public async Task<ActionResult<CommentResponseDto>> AddComment(int blogId, [FromBody] CreateCommentDto dto)
     {
-        return new BlogResponseDto
+        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
         {
-            Id = blog.Id,
-            Title = blog.Title,
-            DescriptionMarkdown = blog.DescriptionMarkdown,
-            AuthorId = blog.AuthorId,
-            AuthorUsername = blog.AuthorUsername,
-            CreatedAtUtc = blog.CreatedAtUtc,
-            ImageUrls = blog.ImageUrls
-        };
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        try
+        {
+            var comment = await _commentService.AddCommentAsync(blogId, dto, currentUser!);
+            return CreatedAtAction(nameof(GetById), new { id = blogId }, comment);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [Authorize]
+    [HttpPut("{blogId:int}/comments/{commentId:int}")]
+    public async Task<ActionResult<CommentResponseDto>> UpdateComment(
+        int blogId,
+        int commentId,
+        [FromBody] UpdateCommentDto dto)
+    {
+        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        {
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        try
+        {
+            var comment = await _commentService.UpdateCommentAsync(blogId, commentId, dto, currentUser!);
+            return Ok(comment);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [Authorize]
+    [HttpPost("{blogId:int}/likes")]
+    public async Task<IActionResult> AddLike(int blogId)
+    {
+        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        {
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        try
+        {
+            await _likeService.AddLikeAsync(blogId, currentUser!);
+            return Ok();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [Authorize]
+    [HttpDelete("{blogId:int}/likes")]
+    public async Task<IActionResult> RemoveLike(int blogId)
+    {
+        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        {
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        try
+        {
+            await _likeService.RemoveLikeAsync(blogId, currentUser!);
+            return Ok();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 }

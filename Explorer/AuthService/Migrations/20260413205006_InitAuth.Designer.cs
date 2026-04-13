@@ -11,7 +11,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AuthService.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260412144541_InitAuth")]
+    [Migration("20260413205006_InitAuth")]
     partial class InitAuth
     {
         /// <inheritdoc />

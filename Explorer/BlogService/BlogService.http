@@ -1,8 +1,10 @@
 @BlogService_HostAddress = http://localhost:5078
+@JwtToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZSI6InBlcmEiLCJleHAiOjE4OTM0NTYwMDB9.gnhM0KIe-f_fq1pfoqv2nW3_X0rXVHjzxPDkakm1Z5k
 
 POST {{BlogService_HostAddress}}/api/blogs
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer {{JwtToken}}
 
 {
   "title": "Moj prvi blog",
@@ -13,3 +15,35 @@ Accept: application/json
 }
 
 ###
+POST {{BlogService_HostAddress}}/api/blogs/1/comments
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{JwtToken}}
+
+{
+  "text": "Odlican blog!"
+}
+
+###
+PUT {{BlogService_HostAddress}}/api/blogs/1/comments/1
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{JwtToken}}
+
+{
+  "text": "Izmenjen komentar."
+}
+
+###
+POST {{BlogService_HostAddress}}/api/blogs/1/likes
+Accept: application/json
+Authorization: Bearer {{JwtToken}}
+
+###
+DELETE {{BlogService_HostAddress}}/api/blogs/1/likes
+Accept: application/json
+Authorization: Bearer {{JwtToken}}
+
+###
+GET {{BlogService_HostAddress}}/api/blogs/1
+Accept: application/json
