@@ -45,6 +45,25 @@ services:
       timeout: 5s
       retries: 10
 
+  blog_db:
+    image: postgres:16-alpine
+    container_name: blog_db
+    environment:
+      POSTGRES_DB: blog_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5435:5432"
+    volumes:
+      - blog_db_data:/var/lib/postgresql/data
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # ── RabbitMQ ─────────────────────────────────────────────────────────────────
 
   rabbitmq:
@@ -122,10 +141,31 @@ services:
       - explorer_network
     restart: on-failure
 
+  blog_service:
+    build:
+      context: ./BlogService
+      dockerfile: Dockerfile.blog
+    container_name: blog_service
+    environment:
+      - ConnectionStrings__Default=Host=blog_db;Port=5432;Database=blog_db;Username=postgres;Password=root
+      - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
+      - Jwt__Issuer=auth-service
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5003:8080"
+    depends_on:
+      blog_db:
+        condition: service_healthy
+    networks:
+      - explorer_network
+    restart: on-failure
+
 # ── Volumes — perzistentni podaci preživljavaju docker-compose down ───────────
 volumes:
   auth_db_data:
   stakeholders_db_data:
+  blog_db_data:
   rabbitmq_data:
 
 # ── Mreža — svi servisi komuniciraju interno po imenu kontejnera ──────────────
