@@ -64,6 +64,25 @@ services:
       timeout: 5s
       retries: 10
 
+  tour_db:
+    image: postgres:16-alpine
+    container_name: tour_db
+    environment:
+      POSTGRES_DB: tour_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5436:5432"
+    volumes:
+      - tour_db_data:/var/lib/postgresql/data
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   neo4j:
     image: neo4j:5-community
     container_name: neo4j
@@ -201,11 +220,31 @@ services:
       - explorer_network
     restart: on-failure
 
+  tour_service:
+    build:
+      context: ./TourService
+      dockerfile: Dockerfile.tour
+    container_name: tour_service
+    environment:
+      - ConnectionStrings__Default=Host=tour_db;Port=5432;Database=tour_db;Username=postgres;Password=root
+      - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5005:8080"
+    depends_on:
+      tour_db:
+        condition: service_healthy
+    networks:
+      - explorer_network
+    restart: on-failure
+
 # ── Volumes — perzistentni podaci preživljavaju docker-compose down ───────────
 volumes:
   auth_db_data:
   stakeholders_db_data:
   blog_db_data:
+  tour_db_data:
   rabbitmq_data:
   neo4j_data:
 
