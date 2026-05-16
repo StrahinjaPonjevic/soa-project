@@ -12,4 +12,5 @@ public class Tour
     public TourStatus Status { get; set; }
     public decimal Price { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public ICollection<KeyPoint> KeyPoints { get; set; } = new List<KeyPoint>();
 }
