@@ -7,10 +7,12 @@ namespace BlogService.Services;
 public class CommentService : ICommentService
 {
     private readonly IBlogRepository _repository;
+    private readonly IFollowerServiceClient _followerService;
 
-    public CommentService(IBlogRepository repository)
+    public CommentService(IBlogRepository repository, IFollowerServiceClient followerService)
     {
         _repository = repository;
+        _followerService = followerService;
     }
 
     public async Task<CommentResponseDto> AddCommentAsync(int blogId, CreateCommentDto dto, CurrentUser currentUser)
@@ -19,6 +21,14 @@ public class CommentService : ICommentService
         if (blog is null)
         {
             throw new KeyNotFoundException("Blog not found.");
+        }
+
+        // Korisnik može komentarisati samo blogove korisnika koje prati (zahtev 2.1 / tačka 9)
+        if (blog.AuthorId != currentUser.UserId)
+        {
+            var follows = await _followerService.IsFollowingAsync(currentUser.UserId, blog.AuthorId);
+            if (!follows)
+                throw new UnauthorizedAccessException("You can only comment on blogs of users you follow.");
         }
 
         var now = DateTime.UtcNow;

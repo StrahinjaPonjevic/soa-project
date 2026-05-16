@@ -64,6 +64,24 @@ services:
       timeout: 5s
       retries: 10
 
+  neo4j:
+    image: neo4j:5-community
+    container_name: neo4j
+    environment:
+      NEO4J_AUTH: neo4j/neo4jpassword
+    ports:
+      - "7474:7474"   # Neo4j Browser UI — http://localhost:7474
+      - "7687:7687"   # Bolt protokol — Go driver se konektuje ovde
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7474"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
   # ── RabbitMQ ─────────────────────────────────────────────────────────────────
 
   rabbitmq:
@@ -150,6 +168,7 @@ services:
       - ConnectionStrings__Default=Host=blog_db;Port=5432;Database=blog_db;Username=postgres;Password=root
       - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
       - Jwt__Issuer=auth-service
+      - FollowerService__BaseUrl=http://follower_service:8080
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
     ports:
@@ -161,12 +180,34 @@ services:
       - explorer_network
     restart: on-failure
 
+  follower_service:
+    build:
+      context: ./FollowerService
+      dockerfile: Dockerfile
+    container_name: follower_service
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=neo4jpassword
+      - BLOG_SERVICE_URL=http://blog_service:8080
+      - JWT_KEY=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
+      - PORT=8080
+    ports:
+      - "5004:8080"   # Follower servis dostupan na localhost:5004
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - explorer_network
+    restart: on-failure
+
 # ── Volumes — perzistentni podaci preživljavaju docker-compose down ───────────
 volumes:
   auth_db_data:
   stakeholders_db_data:
   blog_db_data:
   rabbitmq_data:
+  neo4j_data:
 
 # ── Mreža — svi servisi komuniciraju interno po imenu kontejnera ──────────────
 networks:

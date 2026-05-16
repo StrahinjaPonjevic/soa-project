@@ -18,6 +18,14 @@ builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+// HTTP client za Follower servis
+builder.Services.AddHttpClient("FollowerService", client =>
+{
+    var baseUrl = builder.Configuration["FollowerService:BaseUrl"] ?? "http://localhost:5004";
+    client.BaseAddress = new Uri(baseUrl);
+});
+builder.Services.AddScoped<IFollowerServiceClient, FollowerServiceClient>();
+
 var jwtKey = builder.Configuration["Jwt:Key"]!;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -83,6 +83,10 @@ public class BlogsController : ControllerBase
         {
             return NotFound(ex.Message);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, ex.Message);
+        }
     }
 
     [Authorize]
