@@ -1,0 +1,79 @@
+:root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #3d2a1f;
+  background-color: #fff7f1;
+  --nav-bg: #c2410c;
+  --nav-link: #fff7ed;
+  --page-bg: #fff7f1;
+  --text-main: #3d2a1f;
+  --accent: #ea580c;
+  --accent-hover: #c2410c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text-main);
+  background: var(--page-bg);
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: var(--nav-bg);
+  color: var(--nav-link);
+}
+
+.top-nav nav {
+  display: flex;
+  gap: 12px;
+}
+
+.top-nav a {
+  color: var(--nav-link);
+  text-decoration: none;
+}
+
+.top-nav a:hover {
+  opacity: 0.9;
+}
+
+.page-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+form {
+  display: grid;
+  gap: 10px;
+  max-width: 500px;
+}
+
+input,
+select,
+textarea,
+button {
+  padding: 10px;
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-hover);
+}
