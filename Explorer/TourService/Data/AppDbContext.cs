@@ -62,7 +62,7 @@ public class AppDbContext : DbContext
                 .HasMaxLength(2048);
 
             entity.HasIndex(k => k.TourId);
-            entity.HasIndex(k => new { k.TourId, k.OrderIndex });
+            entity.HasIndex(k => new { k.TourId, k.OrderIndex }).IsUnique();
         });
     }
 }

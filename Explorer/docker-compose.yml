@@ -259,6 +259,35 @@ services:
       - explorer_network
     restart: on-failure
 
+  api_gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api_gateway
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:8080
+      - STAKEHOLDERS_SERVICE_URL=http://stakeholders_service:8080
+      - BLOG_SERVICE_URL=http://blog_service:8080
+      - FOLLOWER_SERVICE_URL=http://follower_service:8080
+      - TOUR_SERVICE_URL=http://tour_service:8080
+      - PORT=8080
+    ports:
+      - "5000:8080"
+    depends_on:
+      auth_service:
+        condition: service_started
+      stakeholders_service:
+        condition: service_started
+      blog_service:
+        condition: service_started
+      follower_service:
+        condition: service_started
+      tour_service:
+        condition: service_started
+    networks:
+      - explorer_network
+    restart: on-failure
+
 # ── Volumes — perzistentni podaci preživljavaju docker-compose down ───────────
 volumes:
   auth_db_data:

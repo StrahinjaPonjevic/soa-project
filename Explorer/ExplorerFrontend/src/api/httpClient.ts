@@ -1,14 +1,13 @@
 import axios from 'axios'
 
-const authBaseURL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:5001'
-const tourBaseURL = import.meta.env.VITE_TOUR_API_BASE_URL ?? 'http://localhost:5005'
+const gatewayBaseURL = import.meta.env.VITE_API_GATEWAY_BASE_URL ?? 'http://localhost:5000'
 
 export const authHttpClient = axios.create({
-  baseURL: authBaseURL,
+  baseURL: gatewayBaseURL,
 })
 
 export const tourHttpClient = axios.create({
-  baseURL: tourBaseURL,
+  baseURL: gatewayBaseURL,
 })
 
 tourHttpClient.interceptors.request.use((config) => {

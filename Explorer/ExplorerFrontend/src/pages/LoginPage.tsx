@@ -24,7 +24,11 @@ export function LoginPage() {
       authLogin(response.token)
       const authUser = parseAuthUser(response.token)
       const defaultPath = authUser.role === 'Guide' ? '/tours/me' : '/tours'
-      const redirectPath = (location.state as { from?: string } | null)?.from ?? defaultPath
+      const requestedPath = (location.state as { from?: string } | null)?.from
+      const redirectPath =
+        authUser.role === 'Guide'
+          ? requestedPath ?? defaultPath
+          : defaultPath
       navigate(redirectPath)
     } catch {
       setError('Login failed. Check credentials.')

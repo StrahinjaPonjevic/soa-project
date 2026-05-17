@@ -121,6 +121,13 @@ public class ToursController : ControllerBase
             return tour.Result;
         }
 
+        var orderIndexExists = await _context.KeyPoints
+            .AnyAsync(k => k.TourId == tour.Value!.Id && k.OrderIndex == dto.OrderIndex);
+        if (orderIndexExists)
+        {
+            return BadRequest("A key point with the same order index already exists for this tour.");
+        }
+
         var keyPoint = new KeyPoint
         {
             TourId = tour.Value!.Id,
@@ -177,6 +184,16 @@ public class ToursController : ControllerBase
         if (keyPoint is null)
         {
             return NotFound("Key point not found.");
+        }
+
+        var orderIndexExists = await _context.KeyPoints
+            .AnyAsync(k =>
+                k.TourId == tour.Value!.Id &&
+                k.Id != keyPointId &&
+                k.OrderIndex == dto.OrderIndex);
+        if (orderIndexExists)
+        {
+            return BadRequest("A key point with the same order index already exists for this tour.");
         }
 
         keyPoint.Name = dto.Name.Trim();
