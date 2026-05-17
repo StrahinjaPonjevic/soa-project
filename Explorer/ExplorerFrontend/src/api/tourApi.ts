@@ -79,3 +79,19 @@ export async function addTourReview(
   const response = await tourHttpClient.post<TourReviewResponse>(`/api/tours/${tourId}/reviews`, payload)
   return response.data
 }
+
+export type TouristLocationResponse = {
+  latitude: number
+  longitude: number
+  updatedAtUtc: string
+}
+
+export async function getMyTouristLocation() {
+  const response = await tourHttpClient.get<TouristLocationResponse>('/api/tours/me/location')
+  return response.data
+}
+
+export async function setMyTouristLocation(payload: { latitude: number; longitude: number }) {
+  const response = await tourHttpClient.put<TouristLocationResponse>('/api/tours/me/location', payload)
+  return response.data
+}

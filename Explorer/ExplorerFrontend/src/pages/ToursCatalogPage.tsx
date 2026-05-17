@@ -27,16 +27,27 @@ export function ToursCatalogPage() {
   if (loading) return <p>Loading tours...</p>
 
   return (
-    <section>
-      <h1>All Tours</h1>
+    <section className="tours-catalog">
+      <h1 className="tours-catalog-title">All Tours</h1>
       {error && <p>{error}</p>}
       {tours.length === 0 ? (
         <p>No tours available yet.</p>
       ) : (
-        <ul>
+        <ul className="tour-cards">
           {tours.map((tour) => (
-            <li key={tour.id}>
-              <Link to={`/tours/${tour.id}`}>{tour.name}</Link> by {tour.authorUsername} ({tour.difficulty})
+            <li key={tour.id} className="tour-card">
+              <Link className="tour-card-title" to={`/tours/${tour.id}`}>
+                {tour.name}
+              </Link>
+              <p className="tour-card-meta">
+                by <strong>{tour.authorUsername}</strong>
+              </p>
+              <p className="tour-card-meta">
+                Difficulty: <strong>{tour.difficulty}</strong>
+              </p>
+              <p className="tour-card-meta">
+                Status: <strong>{tour.status}</strong> | Price: <strong>{tour.price}</strong>
+              </p>
             </li>
           ))}
         </ul>

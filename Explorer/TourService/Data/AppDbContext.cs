@@ -7,6 +7,7 @@ public class AppDbContext : DbContext
 {
     public DbSet<Tour> Tours => Set<Tour>();
     public DbSet<KeyPoint> KeyPoints => Set<KeyPoint>();
+    public DbSet<TouristLocation> TouristLocations => Set<TouristLocation>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -63,6 +64,11 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(k => k.TourId);
             entity.HasIndex(k => new { k.TourId, k.OrderIndex }).IsUnique();
+        });
+
+        modelBuilder.Entity<TouristLocation>(entity =>
+        {
+            entity.HasIndex(tl => tl.TouristId).IsUnique();
         });
     }
 }

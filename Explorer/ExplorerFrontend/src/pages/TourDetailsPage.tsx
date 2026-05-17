@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useParams } from 'react-router-dom'
+import { MapContainer, Marker, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
 import {
   addKeyPoint,
   addTourReview,
@@ -30,6 +31,13 @@ type ReviewForm = {
   imageUrlsCsv: string
 }
 
+function MapClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (event) => onPick(event.latlng.lat, event.latlng.lng),
+  })
+  return null
+}
+
 export function TourDetailsPage() {
   const { id } = useParams()
   const { token } = useAuth()
@@ -42,6 +50,7 @@ export function TourDetailsPage() {
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null)
   const [editingKeyPointId, setEditingKeyPointId] = useState<number | null>(null)
+  const [selectedMapPosition, setSelectedMapPosition] = useState<[number, number] | null>(null)
   const keyPointForm = useForm<KeyPointForm>({
     defaultValues: {
       name: '',
@@ -85,6 +94,23 @@ export function TourDetailsPage() {
     void run()
   }, [id])
 
+  const sortedKeyPoints = useMemo(() => {
+    if (!tour) {
+      return []
+    }
+    return [...tour.keyPoints].sort((a, b) => a.orderIndex - b.orderIndex)
+  }, [tour])
+
+  const mapCenter = useMemo<[number, number]>(() => {
+    if (selectedMapPosition) {
+      return selectedMapPosition
+    }
+    if (sortedKeyPoints.length > 0) {
+      return [sortedKeyPoints[0].latitude, sortedKeyPoints[0].longitude]
+    }
+    return [44.7866, 20.4489]
+  }, [selectedMapPosition, sortedKeyPoints])
+
   if (loading) return <p>Loading tour details...</p>
   if (error) return <p>{error}</p>
   if (!tour) return <p>Tour not found.</p>
@@ -101,6 +127,7 @@ export function TourDetailsPage() {
       imageUrl: '',
       orderIndex: tour.keyPoints.length,
     })
+    setSelectedMapPosition(null)
     setEditingKeyPointId(null)
   }
 
@@ -111,9 +138,19 @@ export function TourDetailsPage() {
     setReviews(loadedReviews)
   }
 
+  const handleMapPick = (lat: number, lng: number) => {
+    keyPointForm.setValue('latitude', lat, { shouldValidate: true })
+    keyPointForm.setValue('longitude', lng, { shouldValidate: true })
+    setSelectedMapPosition([lat, lng])
+  }
+
   const handleSubmitKeyPoint = keyPointForm.handleSubmit(async (data) => {
     try {
       setKeyPointError(null)
+      if (!selectedMapPosition && editingKeyPointId === null) {
+        setKeyPointError('Select key point location by clicking on the map.')
+        return
+      }
 
       const payload = {
         ...data,
@@ -135,6 +172,7 @@ export function TourDetailsPage() {
 
   const handleEditKeyPoint = (keyPoint: TourResponse['keyPoints'][number]) => {
     setEditingKeyPointId(keyPoint.id)
+    setSelectedMapPosition([keyPoint.latitude, keyPoint.longitude])
     keyPointForm.reset({
       name: keyPoint.name,
       description: keyPoint.description,
@@ -163,6 +201,17 @@ export function TourDetailsPage() {
       setReviewError(null)
       setReviewSuccess(null)
 
+      const visitedDate = new Date(data.visitedAtUtc)
+      if (Number.isNaN(visitedDate.getTime())) {
+        setReviewError('Visited at date is invalid.')
+        return
+      }
+
+      if (data.rating < 1 || data.rating > 5) {
+        setReviewError('Rating must be between 1 and 5.')
+        return
+      }
+
       const imageUrls = data.imageUrlsCsv
         .split(',')
         .map((item) => item.trim())
@@ -170,8 +219,8 @@ export function TourDetailsPage() {
 
       await addTourReview(tour.id, {
         rating: Number(data.rating),
-        comment: data.comment,
-        visitedAtUtc: new Date(data.visitedAtUtc).toISOString(),
+        comment: data.comment.trim(),
+        visitedAtUtc: visitedDate.toISOString(),
         imageUrls,
       })
 
@@ -187,6 +236,8 @@ export function TourDetailsPage() {
       setReviewError('Failed to create review.')
     }
   })
+
+  const polylinePositions = sortedKeyPoints.map((keyPoint) => [keyPoint.latitude, keyPoint.longitude] as [number, number])
 
   return (
     <section>
@@ -207,45 +258,69 @@ export function TourDetailsPage() {
         <strong>Tags:</strong> {tour.tags.length > 0 ? tour.tags.join(', ') : 'No tags'}
       </p>
 
+      <h2>Tour Map</h2>
+      <div className="map-container">
+        <MapContainer center={mapCenter} zoom={13} scrollWheelZoom className="map-view">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {canManageKeyPoints && <MapClickHandler onPick={handleMapPick} />}
+          {polylinePositions.length >= 2 && <Polyline positions={polylinePositions} color="#c2410c" />}
+          {sortedKeyPoints.map((keyPoint) => (
+            <Marker key={keyPoint.id} position={[keyPoint.latitude, keyPoint.longitude]} />
+          ))}
+          {selectedMapPosition && <Marker position={selectedMapPosition} />}
+        </MapContainer>
+      </div>
+
       <h2>Key Points</h2>
-      {tour.keyPoints.length === 0 ? (
+      {sortedKeyPoints.length === 0 ? (
         <p>No key points yet.</p>
       ) : (
         <ul>
-          {tour.keyPoints
-            .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map((keyPoint) => (
-              <li key={keyPoint.id}>
-                <strong>{keyPoint.name}</strong> ({keyPoint.latitude}, {keyPoint.longitude}) - Order{' '}
-                {keyPoint.orderIndex}
-              </li>
-            ))}
+          {sortedKeyPoints.map((keyPoint) => (
+            <li key={keyPoint.id}>
+              <strong>{keyPoint.name}</strong> ({keyPoint.latitude}, {keyPoint.longitude}) - Order {keyPoint.orderIndex}
+            </li>
+          ))}
         </ul>
       )}
 
       {canManageKeyPoints && (
         <section>
           <h2>{editingKeyPointId === null ? 'Add Key Point' : 'Edit Key Point'}</h2>
+          <p>Click on map to select key point coordinates.</p>
           <form onSubmit={handleSubmitKeyPoint}>
-            <input {...keyPointForm.register('name', { required: true })} placeholder="Key point name" />
+            <label htmlFor="keypoint-name">Name</label>
+            <input id="keypoint-name" {...keyPointForm.register('name', { required: true })} placeholder="Key point name" />
+            <label htmlFor="keypoint-description">Description</label>
             <textarea
+              id="keypoint-description"
               {...keyPointForm.register('description', { required: true })}
               placeholder="Key point description"
             />
+            <label htmlFor="keypoint-latitude">Latitude</label>
             <input
+              id="keypoint-latitude"
               {...keyPointForm.register('latitude', { required: true, valueAsNumber: true })}
               placeholder="Latitude"
               type="number"
               step="any"
             />
+            <label htmlFor="keypoint-longitude">Longitude</label>
             <input
+              id="keypoint-longitude"
               {...keyPointForm.register('longitude', { required: true, valueAsNumber: true })}
               placeholder="Longitude"
               type="number"
               step="any"
             />
-            <input {...keyPointForm.register('imageUrl')} placeholder="Image URL" />
+            <label htmlFor="keypoint-image-url">Image URL (optional)</label>
+            <input id="keypoint-image-url" {...keyPointForm.register('imageUrl')} placeholder="Image URL" />
+            <label htmlFor="keypoint-order-index">Order Index</label>
             <input
+              id="keypoint-order-index"
               {...keyPointForm.register('orderIndex', { required: true, valueAsNumber: true })}
               placeholder="Order index"
               type="number"
@@ -261,23 +336,21 @@ export function TourDetailsPage() {
         </section>
       )}
 
-      {canManageKeyPoints && tour.keyPoints.length > 0 && (
+      {canManageKeyPoints && sortedKeyPoints.length > 0 && (
         <section>
           <h2>Manage Key Points</h2>
           <ul>
-            {tour.keyPoints
-              .sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((keyPoint) => (
-                <li key={keyPoint.id}>
-                  <strong>{keyPoint.name}</strong> ({keyPoint.latitude}, {keyPoint.longitude})
-                  <button type="button" onClick={() => handleEditKeyPoint(keyPoint)}>
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => void handleDeleteKeyPoint(keyPoint.id)}>
-                    Delete
-                  </button>
-                </li>
-              ))}
+            {sortedKeyPoints.map((keyPoint) => (
+              <li key={keyPoint.id}>
+                <strong>{keyPoint.name}</strong> ({keyPoint.latitude}, {keyPoint.longitude})
+                <button type="button" onClick={() => handleEditKeyPoint(keyPoint)}>
+                  Edit
+                </button>
+                <button type="button" onClick={() => void handleDeleteKeyPoint(keyPoint.id)}>
+                  Delete
+                </button>
+              </li>
+            ))}
           </ul>
         </section>
       )}
@@ -290,9 +363,10 @@ export function TourDetailsPage() {
           <ul>
             {reviews.map((review) => (
               <li key={review.id}>
-                <strong>{review.touristUsername}</strong> rated it {review.rating}/5
+                <strong>{review.touristUsername}</strong> rated {review.rating}/5
                 <p>{review.comment}</p>
                 <p>Visited: {new Date(review.visitedAtUtc).toLocaleString()}</p>
+                <p>Commented: {new Date(review.createdAtUtc).toLocaleString()}</p>
                 {review.imageUrls.length > 0 && <p>Images: {review.imageUrls.join(', ')}</p>}
               </li>
             ))}
@@ -305,7 +379,7 @@ export function TourDetailsPage() {
           <h2>Add Review</h2>
           <form onSubmit={handleSubmitReview}>
             <input
-              {...reviewForm.register('rating', { required: true, valueAsNumber: true })}
+              {...reviewForm.register('rating', { required: true, valueAsNumber: true, min: 1, max: 5 })}
               type="number"
               min="1"
               max="5"
