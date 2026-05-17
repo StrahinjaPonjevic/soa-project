@@ -14,14 +14,19 @@ public class ToursController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ITourReviewRepository _tourReviewRepository;
 
-    public ToursController(AppDbContext context, ICurrentUserService currentUserService)
+    public ToursController(
+        AppDbContext context,
+        ICurrentUserService currentUserService,
+        ITourReviewRepository tourReviewRepository)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _tourReviewRepository = tourReviewRepository;
     }
 
-    [Authorize]
+    [Authorize(Roles = "Guide")]
     [HttpPost]
     public async Task<ActionResult<TourResponseDto>> Create([FromBody] CreateTourDto dto)
     {
@@ -57,7 +62,7 @@ public class ToursController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = tour.Id }, response);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Guide")]
     [HttpGet("me")]
     public async Task<ActionResult<IReadOnlyList<TourResponseDto>>> GetMine()
     {
@@ -70,6 +75,19 @@ public class ToursController : ControllerBase
             .AsNoTracking()
             .Include(t => t.KeyPoints)
             .Where(t => t.AuthorId == currentUser!.UserId)
+            .OrderByDescending(t => t.CreatedAtUtc)
+            .Select(t => ToResponse(t))
+            .ToListAsync();
+
+        return Ok(tours);
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<TourResponseDto>>> GetAll()
+    {
+        var tours = await _context.Tours
+            .AsNoTracking()
+            .Include(t => t.KeyPoints)
             .OrderByDescending(t => t.CreatedAtUtc)
             .Select(t => ToResponse(t))
             .ToListAsync();
@@ -93,7 +111,7 @@ public class ToursController : ControllerBase
         return Ok(ToResponse(tour));
     }
 
-    [Authorize]
+    [Authorize(Roles = "Guide")]
     [HttpPost("{tourId:int}/keypoints")]
     public async Task<ActionResult<KeyPointResponseDto>> AddKeyPoint(int tourId, [FromBody] CreateKeyPointDto dto)
     {
@@ -140,7 +158,7 @@ public class ToursController : ControllerBase
         return Ok(keyPoints);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Guide")]
     [HttpPut("{tourId:int}/keypoints/{keyPointId:int}")]
     public async Task<ActionResult<KeyPointResponseDto>> UpdateKeyPoint(
         int tourId,
@@ -172,7 +190,7 @@ public class ToursController : ControllerBase
         return Ok(ToResponse(keyPoint));
     }
 
-    [Authorize]
+    [Authorize(Roles = "Guide")]
     [HttpDelete("{tourId:int}/keypoints/{keyPointId:int}")]
     public async Task<IActionResult> DeleteKeyPoint(int tourId, int keyPointId)
     {
@@ -194,6 +212,69 @@ public class ToursController : ControllerBase
         await _context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    [Authorize(Roles = "Tourist")]
+    [HttpPost("{tourId:int}/reviews")]
+    public async Task<ActionResult<TourReviewResponseDto>> AddReview(
+        int tourId,
+        [FromBody] CreateTourReviewDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        {
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        var tourExists = await _context.Tours.AnyAsync(t => t.Id == tourId, cancellationToken);
+        if (!tourExists)
+        {
+            return NotFound("Tour not found.");
+        }
+
+        var normalizedImageUrls = dto.ImageUrls?
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Select(url => url.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? Array.Empty<string>();
+
+        var invalidImageUrl = normalizedImageUrls
+            .FirstOrDefault(url => !Uri.IsWellFormedUriString(url, UriKind.Absolute));
+        if (invalidImageUrl is not null)
+        {
+            return BadRequest($"Invalid image URL: {invalidImageUrl}");
+        }
+
+        var review = new TourReview
+        {
+            TourId = tourId,
+            TouristId = currentUser!.UserId,
+            TouristUsername = currentUser.Username,
+            Rating = dto.Rating,
+            Comment = dto.Comment.Trim(),
+            VisitedAtUtc = dto.VisitedAtUtc,
+            CreatedAtUtc = DateTime.UtcNow,
+            ImageUrls = normalizedImageUrls
+        };
+
+        await _tourReviewRepository.AddAsync(review, cancellationToken);
+        return CreatedAtAction(nameof(GetReviews), new { tourId }, ToResponse(review));
+    }
+
+    [HttpGet("{tourId:int}/reviews")]
+    public async Task<ActionResult<IReadOnlyList<TourReviewResponseDto>>> GetReviews(
+        int tourId,
+        CancellationToken cancellationToken)
+    {
+        var tourExists = await _context.Tours.AnyAsync(t => t.Id == tourId, cancellationToken);
+        if (!tourExists)
+        {
+            return NotFound("Tour not found.");
+        }
+
+        var reviews = await _tourReviewRepository.GetByTourIdAsync(tourId, cancellationToken);
+        return Ok(reviews.Select(ToResponse).ToList());
     }
 
     private static TourResponseDto ToResponse(Tour tour)
@@ -230,6 +311,22 @@ public class ToursController : ControllerBase
             Longitude = keyPoint.Longitude,
             ImageUrl = keyPoint.ImageUrl,
             OrderIndex = keyPoint.OrderIndex
+        };
+    }
+
+    private static TourReviewResponseDto ToResponse(TourReview review)
+    {
+        return new TourReviewResponseDto
+        {
+            Id = review.Id,
+            TourId = review.TourId,
+            TouristId = review.TouristId,
+            TouristUsername = review.TouristUsername,
+            Rating = review.Rating,
+            Comment = review.Comment,
+            VisitedAtUtc = review.VisitedAtUtc,
+            CreatedAtUtc = review.CreatedAtUtc,
+            ImageUrls = review.ImageUrls
         };
     }
 

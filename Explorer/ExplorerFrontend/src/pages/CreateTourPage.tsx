@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { createTour } from '../api/tourApi'
+import { useAuth } from '../features/auth/AuthContext'
+import { parseAuthUser } from '../shared/auth'
 
 type CreateTourForm = {
   name: string
@@ -13,7 +15,18 @@ type CreateTourForm = {
 export function CreateTourPage() {
   const { register, handleSubmit } = useForm<CreateTourForm>()
   const navigate = useNavigate()
+  const { token } = useAuth()
+  const authUser = parseAuthUser(token)
   const [error, setError] = useState<string | null>(null)
+
+  if (authUser.role !== 'Guide') {
+    return (
+      <section>
+        <h1>Create Tour</h1>
+        <p>Only guide accounts can create tours.</p>
+      </section>
+    )
+  }
 
   const onSubmit = async (data: CreateTourForm) => {
     try {

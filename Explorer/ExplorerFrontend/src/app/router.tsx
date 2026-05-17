@@ -8,6 +8,7 @@ import { MyToursPage } from '../pages/MyToursPage'
 import { CreateTourPage } from '../pages/CreateTourPage'
 import { TourDetailsPage } from '../pages/TourDetailsPage'
 import { SimulatorPage } from '../pages/SimulatorPage'
+import { ToursCatalogPage } from '../pages/ToursCatalogPage'
 
 export function AppRouter() {
   return (
@@ -15,9 +16,18 @@ export function AppRouter() {
       <AuthProvider>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/tours/me" replace />} />
+            <Route path="/" element={<Navigate to="/tours" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+
+            <Route
+              path="/tours"
+              element={
+                <ProtectedRoute>
+                  <ToursCatalogPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/tours/me"

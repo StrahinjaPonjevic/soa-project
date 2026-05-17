@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../api/authApi'
 import { useAuth } from '../features/auth/AuthContext'
+import { parseAuthUser } from '../shared/auth'
 
 type LoginForm = {
   username: string
@@ -21,7 +22,9 @@ export function LoginPage() {
       setError(null)
       const response = await login(data.username, data.password)
       authLogin(response.token)
-      const redirectPath = (location.state as { from?: string } | null)?.from ?? '/tours/me'
+      const authUser = parseAuthUser(response.token)
+      const defaultPath = authUser.role === 'Guide' ? '/tours/me' : '/tours'
+      const redirectPath = (location.state as { from?: string } | null)?.from ?? defaultPath
       navigate(redirectPath)
     } catch {
       setError('Login failed. Check credentials.')

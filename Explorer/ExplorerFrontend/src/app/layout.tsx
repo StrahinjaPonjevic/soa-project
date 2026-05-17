@@ -1,9 +1,11 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
+import { parseAuthUser } from '../shared/auth'
 
 export function AppLayout() {
-  const { isAuthenticated, logout } = useAuth()
+  const { isAuthenticated, logout, token } = useAuth()
   const navigate = useNavigate()
+  const authUser = parseAuthUser(token)
 
   const handleLogout = () => {
     logout()
@@ -14,8 +16,9 @@ export function AppLayout() {
     <div className="app-shell">
       <header className="top-nav">
         <nav>
-          <Link to="/tours/me">My Tours</Link>
-          <Link to="/tours/new">Create Tour</Link>
+          <Link to="/tours">All Tours</Link>
+          {authUser.role === 'Guide' && <Link to="/tours/me">My Tours</Link>}
+          {authUser.role === 'Guide' && <Link to="/tours/new">Create Tour</Link>}
           <Link to="/simulator">Simulator</Link>
         </nav>
         <div>

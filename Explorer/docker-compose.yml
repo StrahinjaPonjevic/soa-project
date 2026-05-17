@@ -83,6 +83,21 @@ services:
       timeout: 5s
       retries: 10
 
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
   neo4j:
     image: neo4j:5-community
     container_name: neo4j
@@ -227,6 +242,9 @@ services:
     container_name: tour_service
     environment:
       - ConnectionStrings__Default=Host=tour_db;Port=5432;Database=tour_db;Username=postgres;Password=root
+      - MongoDb__ConnectionString=mongodb://mongodb:27017
+      - MongoDb__DatabaseName=tour_reviews_db
+      - MongoDb__ReviewsCollectionName=tour_reviews
       - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
@@ -234,6 +252,8 @@ services:
       - "5005:8080"
     depends_on:
       tour_db:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - explorer_network
@@ -245,6 +265,7 @@ volumes:
   stakeholders_db_data:
   blog_db_data:
   tour_db_data:
+  mongodb_data:
   rabbitmq_data:
   neo4j_data:
 

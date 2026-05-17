@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using Microsoft.OpenApi.Models;
+using System.Text.Json.Serialization;
 using System.Text;
+using TourService.Configuration;
 using TourService.Data;
 using TourService.Services;
 
@@ -10,7 +13,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -41,6 +48,16 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.Configure<MongoDbSettings>(
+    builder.Configuration.GetSection(MongoDbSettings.SectionName));
+builder.Services.AddSingleton<IMongoClient>(_ =>
+{
+    var settings = builder.Configuration
+        .GetSection(MongoDbSettings.SectionName)
+        .Get<MongoDbSettings>() ?? new MongoDbSettings();
+
+    return new MongoClient(settings.ConnectionString);
+});
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
@@ -60,6 +77,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<ITourReviewRepository, MongoTourReviewRepository>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>

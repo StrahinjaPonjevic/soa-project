@@ -1,27 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getMyTours } from '../api/tourApi'
-import { useAuth } from '../features/auth/AuthContext'
-import { parseAuthUser } from '../shared/auth'
+import { getTours } from '../api/tourApi'
 import type { TourResponse } from '../shared/types/tour'
 
-export function MyToursPage() {
-  const { token } = useAuth()
-  const authUser = parseAuthUser(token)
+export function ToursCatalogPage() {
   const [tours, setTours] = useState<TourResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (authUser.role !== 'Guide') {
-      setLoading(false)
-      return
-    }
-
     const run = async () => {
       try {
         setError(null)
-        const data = await getMyTours()
+        const data = await getTours()
         setTours(data)
       } catch {
         setError('Failed to load tours.')
@@ -31,23 +22,21 @@ export function MyToursPage() {
     }
 
     void run()
-  }, [authUser.role])
+  }, [])
 
   if (loading) return <p>Loading tours...</p>
-  if (authUser.role !== 'Guide') return <p>Only guide accounts have personal tours.</p>
 
   return (
     <section>
-      <h1>My Tours</h1>
-      <Link to="/tours/new">Create new tour</Link>
+      <h1>All Tours</h1>
       {error && <p>{error}</p>}
       {tours.length === 0 ? (
-        <p>No tours yet.</p>
+        <p>No tours available yet.</p>
       ) : (
         <ul>
           {tours.map((tour) => (
             <li key={tour.id}>
-              <Link to={`/tours/${tour.id}`}>{tour.name}</Link> ({tour.status})
+              <Link to={`/tours/${tour.id}`}>{tour.name}</Link> by {tour.authorUsername} ({tour.difficulty})
             </li>
           ))}
         </ul>
