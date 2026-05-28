@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { createTour } from '../api/tourApi'
 import { useAuth } from '../features/auth/AuthContext'
 import { parseAuthUser } from '../shared/auth'
@@ -18,6 +18,7 @@ export function CreateTourPage() {
   const { token } = useAuth()
   const authUser = parseAuthUser(token)
   const [error, setError] = useState<string | null>(null)
+  const [createdTourId, setCreatedTourId] = useState<number | null>(null)
 
   if (authUser.role !== 'Guide') {
     return (
@@ -31,6 +32,7 @@ export function CreateTourPage() {
   const onSubmit = async (data: CreateTourForm) => {
     try {
       setError(null)
+      setCreatedTourId(null)
       const tags = data.tagsCsv
         .split(',')
         .map((x) => x.trim())
@@ -43,6 +45,7 @@ export function CreateTourPage() {
         tags,
       })
 
+      setCreatedTourId(created.id)
       navigate(`/tours/${created.id}`)
     } catch {
       setError('Failed to create tour.')
@@ -52,6 +55,7 @@ export function CreateTourPage() {
   return (
     <section>
       <h1>Create Tour</h1>
+      <p>Step 1: create the draft. Step 2: on the details page add key points, travel times, and publish the tour.</p>
       <form onSubmit={handleSubmit(onSubmit)}>
         <input {...register('name', { required: true })} placeholder="Tour name" />
         <textarea {...register('description', { required: true })} placeholder="Description" />
@@ -60,6 +64,12 @@ export function CreateTourPage() {
         <button type="submit">Create</button>
       </form>
       {error && <p>{error}</p>}
+      {createdTourId && (
+        <p>
+          Draft tour created. Continue here:{' '}
+          <Link to={`/tours/${createdTourId}`}>open tour details and add key points</Link>
+        </p>
+      )}
     </section>
   )
 }

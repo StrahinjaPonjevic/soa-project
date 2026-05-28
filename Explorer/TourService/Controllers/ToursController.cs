@@ -14,59 +14,48 @@ public class ToursController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ITourManagementService _tourManagementService;
     private readonly ITourReviewRepository _tourReviewRepository;
 
     public ToursController(
         AppDbContext context,
         ICurrentUserService currentUserService,
+        ITourManagementService tourManagementService,
         ITourReviewRepository tourReviewRepository)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _tourManagementService = tourManagementService;
         _tourReviewRepository = tourReviewRepository;
     }
 
     [Authorize(Roles = "Guide")]
     [HttpPost]
-    public async Task<ActionResult<TourResponseDto>> Create([FromBody] CreateTourDto dto)
+    public async Task<ActionResult<TourResponseDto>> Create([FromBody] CreateTourDto dto, CancellationToken cancellationToken)
     {
-        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
         {
             return Unauthorized("Missing user claims in token.");
         }
 
-        var normalizedTags = dto.Tags?
-            .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(tag => tag.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray()
-            ?? Array.Empty<string>();
-
-        var tour = new Tour
+        try
         {
-            AuthorId = currentUser!.UserId,
-            AuthorUsername = currentUser.Username,
-            Name = dto.Name.Trim(),
-            Description = dto.Description.Trim(),
-            Difficulty = dto.Difficulty.Trim(),
-            Tags = normalizedTags,
-            Status = TourStatus.Draft,
-            Price = 0,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-
-        await _context.Tours.AddAsync(tour);
-        await _context.SaveChangesAsync();
-
-        var response = ToResponse(tour);
-        return CreatedAtAction(nameof(GetById), new { id = tour.Id }, response);
+            var tour = await _tourManagementService.CreateDraftTourAsync(currentUser, dto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = tour.Id }, ToAuthorResponse(tour));
+        }
+        catch (TourOperationException ex)
+        {
+            return ToErrorResult(ex);
+        }
     }
 
     [Authorize(Roles = "Guide")]
     [HttpGet("me")]
-    public async Task<ActionResult<IReadOnlyList<TourResponseDto>>> GetMine()
+    public async Task<ActionResult<IReadOnlyList<TourResponseDto>>> GetMine(CancellationToken cancellationToken)
     {
-        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
         {
             return Unauthorized("Missing user claims in token.");
         }
@@ -74,95 +63,193 @@ public class ToursController : ControllerBase
         var tours = await _context.Tours
             .AsNoTracking()
             .Include(t => t.KeyPoints)
-            .Where(t => t.AuthorId == currentUser!.UserId)
+            .Include(t => t.TravelTimes)
+            .Where(t => t.AuthorId == currentUser.UserId)
             .OrderByDescending(t => t.CreatedAtUtc)
-            .Select(t => ToResponse(t))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
-        return Ok(tours);
+        return Ok(tours.Select(ToAuthorResponse).ToList());
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<TourResponseDto>>> GetAll()
+    public async Task<ActionResult<IReadOnlyList<TourResponseDto>>> GetAll(CancellationToken cancellationToken)
     {
         var tours = await _context.Tours
             .AsNoTracking()
             .Include(t => t.KeyPoints)
-            .OrderByDescending(t => t.CreatedAtUtc)
-            .Select(t => ToResponse(t))
-            .ToListAsync();
+            .Include(t => t.TravelTimes)
+            .Where(t => t.Status == TourStatus.Published)
+            .OrderByDescending(t => t.PublishedAtUtc ?? t.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
 
-        return Ok(tours);
+        return Ok(tours.Select(ToPublicResponse).ToList());
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<TourResponseDto>> GetById(int id)
+    public async Task<ActionResult<TourResponseDto>> GetById(int id, CancellationToken cancellationToken)
     {
         var tour = await _context.Tours
             .AsNoTracking()
             .Include(t => t.KeyPoints)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .Include(t => t.TravelTimes)
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
         if (tour is null)
         {
             return NotFound();
         }
 
-        return Ok(ToResponse(tour));
+        var currentUser = GetCurrentUserOrNull();
+        var isOwner = currentUser is not null && currentUser.UserId == tour.AuthorId;
+        if (isOwner)
+        {
+            return Ok(ToAuthorResponse(tour));
+        }
+
+        if (tour.Status != TourStatus.Published)
+        {
+            return NotFound();
+        }
+
+        return Ok(ToPublicResponse(tour));
+    }
+
+    [Authorize(Roles = "Guide")]
+    [HttpPut("{tourId:int}")]
+    public async Task<ActionResult<TourResponseDto>> Update(
+        int tourId,
+        [FromBody] UpdateTourDto dto,
+        CancellationToken cancellationToken)
+    {
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
+        {
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        try
+        {
+            var tour = await _tourManagementService.UpdateTourAsync(tourId, currentUser, dto, cancellationToken);
+            return Ok(ToAuthorResponse(tour));
+        }
+        catch (TourOperationException ex)
+        {
+            return ToErrorResult(ex);
+        }
     }
 
     [Authorize(Roles = "Guide")]
     [HttpPost("{tourId:int}/keypoints")]
-    public async Task<ActionResult<KeyPointResponseDto>> AddKeyPoint(int tourId, [FromBody] CreateKeyPointDto dto)
+    public async Task<ActionResult<KeyPointResponseDto>> AddKeyPoint(
+        int tourId,
+        [FromBody] CreateKeyPointDto dto,
+        CancellationToken cancellationToken)
     {
-        var tour = await GetOwnedTourAsync(tourId);
-        if (tour.Result is not null)
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
         {
-            return tour.Result;
+            return Unauthorized("Missing user claims in token.");
         }
 
-        var orderIndexExists = await _context.KeyPoints
-            .AnyAsync(k => k.TourId == tour.Value!.Id && k.OrderIndex == dto.OrderIndex);
-        if (orderIndexExists)
+        try
         {
-            return BadRequest("A key point with the same order index already exists for this tour.");
+            var keyPoint = await _tourManagementService.AddKeyPointAsync(tourId, currentUser, dto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = tourId }, ToResponse(keyPoint));
         }
-
-        var keyPoint = new KeyPoint
+        catch (TourOperationException ex)
         {
-            TourId = tour.Value!.Id,
-            Name = dto.Name.Trim(),
-            Description = dto.Description.Trim(),
-            Latitude = dto.Latitude,
-            Longitude = dto.Longitude,
-            ImageUrl = NormalizeOptionalText(dto.ImageUrl),
-            OrderIndex = dto.OrderIndex
-        };
-
-        await _context.KeyPoints.AddAsync(keyPoint);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = tourId }, ToResponse(keyPoint));
+            return ToErrorResult(ex);
+        }
     }
 
     [HttpGet("{tourId:int}/keypoints")]
-    public async Task<ActionResult<IReadOnlyList<KeyPointResponseDto>>> GetKeyPoints(int tourId)
+    public async Task<ActionResult<IReadOnlyList<KeyPointResponseDto>>> GetKeyPoints(int tourId, CancellationToken cancellationToken)
     {
-        var tourExists = await _context.Tours.AnyAsync(t => t.Id == tourId);
-        if (!tourExists)
+        var tour = await _context.Tours
+            .AsNoTracking()
+            .Include(t => t.KeyPoints)
+            .FirstOrDefaultAsync(t => t.Id == tourId, cancellationToken);
+
+        if (tour is null)
         {
             return NotFound("Tour not found.");
         }
 
-        var keyPoints = await _context.KeyPoints
-            .AsNoTracking()
-            .Where(k => k.TourId == tourId)
+        var currentUser = GetCurrentUserOrNull();
+        var isOwner = currentUser is not null && currentUser.UserId == tour.AuthorId;
+        if (!isOwner && tour.Status != TourStatus.Published)
+        {
+            return NotFound("Tour not found.");
+        }
+
+        var keyPoints = tour.KeyPoints
             .OrderBy(k => k.OrderIndex)
             .ThenBy(k => k.Id)
-            .Select(k => ToResponse(k))
-            .ToListAsync();
+            .Select(ToResponse)
+            .ToList();
+
+        if (!isOwner && keyPoints.Count > 1)
+        {
+            keyPoints = keyPoints.Take(1).ToList();
+        }
 
         return Ok(keyPoints);
+    }
+
+    [HttpGet("{tourId:int}/route-preview")]
+    public async Task<ActionResult<RoutePreviewDto>> GetRoutePreview(int tourId, CancellationToken cancellationToken)
+    {
+        var tour = await _context.Tours
+            .AsNoTracking()
+            .Include(t => t.KeyPoints)
+            .FirstOrDefaultAsync(t => t.Id == tourId, cancellationToken);
+
+        if (tour is null)
+        {
+            return NotFound("Tour not found.");
+        }
+
+        var currentUser = GetCurrentUserOrNull();
+        var isOwner = currentUser is not null && currentUser.UserId == tour.AuthorId;
+        if (!isOwner && tour.Status != TourStatus.Published)
+        {
+            return NotFound("Tour not found.");
+        }
+
+        if (!isOwner)
+        {
+            // Tourists must not see the rest of the route geometry.
+            return Ok(new RoutePreviewDto());
+        }
+
+        var orderedKeyPoints = tour.KeyPoints
+            .OrderBy(k => k.OrderIndex)
+            .ThenBy(k => k.Id)
+            .ToList();
+
+        if (orderedKeyPoints.Count < 2)
+        {
+            return Ok(new RoutePreviewDto());
+        }
+
+        try
+        {
+            var routePoints = await _tourManagementService.GetRoutePreviewAsync(orderedKeyPoints, cancellationToken);
+            return Ok(new RoutePreviewDto
+            {
+                Points = routePoints
+                    .Select(point => new RoutePointDto
+                    {
+                        Latitude = point.Latitude,
+                        Longitude = point.Longitude
+                    })
+                    .ToList()
+            });
+        }
+        catch (TourOperationException ex)
+        {
+            return ToErrorResult(ex);
+        }
     }
 
     [Authorize(Roles = "Guide")]
@@ -170,65 +257,93 @@ public class ToursController : ControllerBase
     public async Task<ActionResult<KeyPointResponseDto>> UpdateKeyPoint(
         int tourId,
         int keyPointId,
-        [FromBody] UpdateKeyPointDto dto)
+        [FromBody] UpdateKeyPointDto dto,
+        CancellationToken cancellationToken)
     {
-        var tour = await GetOwnedTourAsync(tourId);
-        if (tour.Result is not null)
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
         {
-            return tour.Result;
+            return Unauthorized("Missing user claims in token.");
         }
 
-        var keyPoint = await _context.KeyPoints
-            .FirstOrDefaultAsync(k => k.TourId == tour.Value!.Id && k.Id == keyPointId);
-
-        if (keyPoint is null)
+        try
         {
-            return NotFound("Key point not found.");
+            var keyPoint = await _tourManagementService.UpdateKeyPointAsync(tourId, keyPointId, currentUser, dto, cancellationToken);
+            return Ok(ToResponse(keyPoint));
         }
-
-        var orderIndexExists = await _context.KeyPoints
-            .AnyAsync(k =>
-                k.TourId == tour.Value!.Id &&
-                k.Id != keyPointId &&
-                k.OrderIndex == dto.OrderIndex);
-        if (orderIndexExists)
+        catch (TourOperationException ex)
         {
-            return BadRequest("A key point with the same order index already exists for this tour.");
+            return ToErrorResult(ex);
         }
-
-        keyPoint.Name = dto.Name.Trim();
-        keyPoint.Description = dto.Description.Trim();
-        keyPoint.Latitude = dto.Latitude;
-        keyPoint.Longitude = dto.Longitude;
-        keyPoint.ImageUrl = NormalizeOptionalText(dto.ImageUrl);
-        keyPoint.OrderIndex = dto.OrderIndex;
-
-        await _context.SaveChangesAsync();
-        return Ok(ToResponse(keyPoint));
     }
 
     [Authorize(Roles = "Guide")]
     [HttpDelete("{tourId:int}/keypoints/{keyPointId:int}")]
-    public async Task<IActionResult> DeleteKeyPoint(int tourId, int keyPointId)
+    public async Task<IActionResult> DeleteKeyPoint(int tourId, int keyPointId, CancellationToken cancellationToken)
     {
-        var tour = await GetOwnedTourAsync(tourId);
-        if (tour.Result is not null)
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
         {
-            return tour.Result;
+            return Unauthorized("Missing user claims in token.");
         }
 
-        var keyPoint = await _context.KeyPoints
-            .FirstOrDefaultAsync(k => k.TourId == tour.Value!.Id && k.Id == keyPointId);
-
-        if (keyPoint is null)
+        try
         {
-            return NotFound("Key point not found.");
+            await _tourManagementService.DeleteKeyPointAsync(tourId, keyPointId, currentUser, cancellationToken);
+            return NoContent();
+        }
+        catch (TourOperationException ex)
+        {
+            return ToErrorResult(ex);
+        }
+    }
+
+    [Authorize(Roles = "Guide")]
+    [HttpPut("{tourId:int}/travel-times")]
+    public async Task<ActionResult<IReadOnlyList<TourTravelTimeDto>>> ReplaceTravelTimes(
+        int tourId,
+        [FromBody] UpdateTourTravelTimesDto dto,
+        CancellationToken cancellationToken)
+    {
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
+        {
+            return Unauthorized("Missing user claims in token.");
         }
 
-        _context.KeyPoints.Remove(keyPoint);
-        await _context.SaveChangesAsync();
+        try
+        {
+            var travelTimes = await _tourManagementService.ReplaceTravelTimesAsync(tourId, currentUser, dto, cancellationToken);
+            return Ok(travelTimes
+                .OrderBy(tt => tt.TransportType)
+                .Select(ToResponse)
+                .ToList());
+        }
+        catch (TourOperationException ex)
+        {
+            return ToErrorResult(ex);
+        }
+    }
 
-        return NoContent();
+    [Authorize(Roles = "Guide")]
+    [HttpPost("{tourId:int}/reactivate")]
+    public async Task<ActionResult<TourResponseDto>> Reactivate(int tourId, CancellationToken cancellationToken)
+    {
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
+        {
+            return Unauthorized("Missing user claims in token.");
+        }
+
+        try
+        {
+            var tour = await _tourManagementService.ReactivateAsync(tourId, currentUser, cancellationToken);
+            return Ok(ToAuthorResponse(tour));
+        }
+        catch (TourOperationException ex)
+        {
+            return ToErrorResult(ex);
+        }
     }
 
     [Authorize(Roles = "Tourist")]
@@ -238,13 +353,17 @@ public class ToursController : ControllerBase
         [FromBody] CreateTourReviewDto dto,
         CancellationToken cancellationToken)
     {
-        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
+        var currentUser = GetCurrentUserOrUnauthorized();
+        if (currentUser is null)
         {
             return Unauthorized("Missing user claims in token.");
         }
 
-        var tourExists = await _context.Tours.AnyAsync(t => t.Id == tourId, cancellationToken);
-        if (!tourExists)
+        var tour = await _context.Tours
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == tourId, cancellationToken);
+
+        if (tour is null || tour.Status != TourStatus.Published)
         {
             return NotFound("Tour not found.");
         }
@@ -266,7 +385,7 @@ public class ToursController : ControllerBase
         var review = new TourReview
         {
             TourId = tourId,
-            TouristId = currentUser!.UserId,
+            TouristId = currentUser.UserId,
             TouristUsername = currentUser.Username,
             Rating = dto.Rating,
             Comment = dto.Comment.Trim(),
@@ -284,8 +403,18 @@ public class ToursController : ControllerBase
         int tourId,
         CancellationToken cancellationToken)
     {
-        var tourExists = await _context.Tours.AnyAsync(t => t.Id == tourId, cancellationToken);
-        if (!tourExists)
+        var tour = await _context.Tours
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == tourId, cancellationToken);
+
+        if (tour is null)
+        {
+            return NotFound("Tour not found.");
+        }
+
+        var currentUser = GetCurrentUserOrNull();
+        var isOwner = currentUser is not null && currentUser.UserId == tour.AuthorId;
+        if (!isOwner && tour.Status != TourStatus.Published)
         {
             return NotFound("Tour not found.");
         }
@@ -294,8 +423,27 @@ public class ToursController : ControllerBase
         return Ok(reviews.Select(ToResponse).ToList());
     }
 
-    private static TourResponseDto ToResponse(Tour tour)
+    public static TourResponseDto ToAuthorResponse(Tour tour)
     {
+        return ToResponse(tour, includeAllKeyPoints: true);
+    }
+
+    public static TourResponseDto ToPublicResponse(Tour tour)
+    {
+        return ToResponse(tour, includeAllKeyPoints: false);
+    }
+
+    private static TourResponseDto ToResponse(Tour tour, bool includeAllKeyPoints)
+    {
+        IEnumerable<KeyPoint> orderedKeyPoints = tour.KeyPoints
+            .OrderBy(k => k.OrderIndex)
+            .ThenBy(k => k.Id);
+
+        if (!includeAllKeyPoints)
+        {
+            orderedKeyPoints = orderedKeyPoints.Take(1);
+        }
+
         return new TourResponseDto
         {
             Id = tour.Id,
@@ -307,10 +455,13 @@ public class ToursController : ControllerBase
             Tags = tour.Tags,
             Status = tour.Status,
             Price = tour.Price,
+            LengthKm = tour.LengthKm,
             CreatedAtUtc = tour.CreatedAtUtc,
-            KeyPoints = tour.KeyPoints
-                .OrderBy(k => k.OrderIndex)
-                .ThenBy(k => k.Id)
+            PublishedAtUtc = tour.PublishedAtUtc,
+            ArchivedAtUtc = tour.ArchivedAtUtc,
+            KeyPoints = orderedKeyPoints.Select(ToResponse).ToList(),
+            TravelTimes = tour.TravelTimes
+                .OrderBy(tt => tt.TransportType)
                 .Select(ToResponse)
                 .ToList()
         };
@@ -331,6 +482,15 @@ public class ToursController : ControllerBase
         };
     }
 
+    private static TourTravelTimeDto ToResponse(TourTravelTime travelTime)
+    {
+        return new TourTravelTimeDto
+        {
+            TransportType = travelTime.TransportType,
+            DurationMinutes = travelTime.DurationMinutes
+        };
+    }
+
     private static TourReviewResponseDto ToResponse(TourReview review)
     {
         return new TourReviewResponseDto
@@ -347,29 +507,23 @@ public class ToursController : ControllerBase
         };
     }
 
-    private async Task<ActionResult<Tour>> GetOwnedTourAsync(int tourId)
+    private CurrentUser? GetCurrentUserOrUnauthorized()
     {
-        if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
-        {
-            return Unauthorized("Missing user claims in token.");
-        }
-
-        var tour = await _context.Tours.FirstOrDefaultAsync(t => t.Id == tourId);
-        if (tour is null)
-        {
-            return NotFound("Tour not found.");
-        }
-
-        if (tour.AuthorId != currentUser!.UserId)
-        {
-            return Forbid();
-        }
-
-        return tour;
+        return _currentUserService.TryGetCurrentUser(User, out var currentUser) ? currentUser : null;
     }
 
-    private static string? NormalizeOptionalText(string? value)
+    private CurrentUser? GetCurrentUserOrNull()
     {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        _currentUserService.TryGetCurrentUser(User, out var currentUser);
+        return currentUser;
+    }
+
+    private ActionResult ToErrorResult(TourOperationException ex)
+    {
+        return StatusCode(ex.StatusCode, new
+        {
+            message = ex.Message,
+            errors = ex.Errors
+        });
     }
 }

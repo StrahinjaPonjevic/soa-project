@@ -11,6 +11,10 @@ public class Tour
     public string[] Tags { get; set; } = Array.Empty<string>();
     public TourStatus Status { get; set; }
     public decimal Price { get; set; }
+    public double LengthKm { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime? PublishedAtUtc { get; set; }
+    public DateTime? ArchivedAtUtc { get; set; }
     public ICollection<KeyPoint> KeyPoints { get; set; } = new List<KeyPoint>();
+    public ICollection<TourTravelTime> TravelTimes { get; set; } = new List<TourTravelTime>();
 }

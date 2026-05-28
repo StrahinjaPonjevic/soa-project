@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
+import type { LeafletMouseEvent } from 'leaflet'
 import { getMyTouristLocation, setMyTouristLocation } from '../api/tourApi'
 import { useAuth } from '../features/auth/AuthContext'
 import { parseAuthUser } from '../shared/auth'
@@ -11,9 +12,12 @@ type Position = {
   longitude: number
 }
 
+const LeafletMapContainer = MapContainer as any
+const LeafletTileLayer = TileLayer as any
+
 function MapClickHandler({ onPick }: { onPick: (position: Position) => void }) {
   useMapEvents({
-    click: (event) => {
+    click: (event: LeafletMouseEvent) => {
       onPick({
         latitude: event.latlng.lat,
         longitude: event.latlng.lng,
@@ -86,14 +90,14 @@ export function SimulatorPage() {
       <p>Click on map to set your current location.</p>
 
       <div className="map-container">
-        <MapContainer center={center} zoom={13} scrollWheelZoom className="map-view">
-          <TileLayer
+        <LeafletMapContainer center={center} zoom={13} scrollWheelZoom className="map-view">
+          <LeafletTileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <MapClickHandler onPick={onPickLocation} />
           {currentLocation && <Marker position={[currentLocation.latitude, currentLocation.longitude]} />}
-        </MapContainer>
+        </LeafletMapContainer>
       </div>
 
       {currentLocation ? (

@@ -9,6 +9,18 @@ export type KeyPointResponse = {
   orderIndex: number
 }
 
+export type TransportType = 'Walking' | 'Bicycle' | 'Car'
+
+export type TourTravelTimeResponse = {
+  transportType: TransportType
+  durationMinutes: number
+}
+
+export type RoutePointResponse = {
+  latitude: number
+  longitude: number
+}
+
 export type TourResponse = {
   id: number
   authorId: number
@@ -19,6 +31,10 @@ export type TourResponse = {
   tags: string[]
   status: string
   price: number
+  lengthKm: number
   createdAtUtc: string
+  publishedAtUtc?: string | null
+  archivedAtUtc?: string | null
   keyPoints: KeyPointResponse[]
+  travelTimes: TourTravelTimeResponse[]
 }

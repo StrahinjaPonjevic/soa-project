@@ -245,6 +245,8 @@ services:
       - MongoDb__ConnectionString=mongodb://mongodb:27017
       - MongoDb__DatabaseName=tour_reviews_db
       - MongoDb__ReviewsCollectionName=tour_reviews
+      - MapRouting__BaseUrl=https://router.project-osrm.org
+      - MapRouting__Profile=foot
       - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development

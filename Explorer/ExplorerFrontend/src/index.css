@@ -1,17 +1,30 @@
 :root {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #3d2a1f;
-  background-color: #fff7f1;
-  --nav-bg: #c2410c;
+  color: #2f241d;
+  background-color: #f6efe7;
+  --nav-bg: linear-gradient(90deg, #b84210 0%, #d45713 100%);
   --nav-link: #fff7ed;
-  --page-bg: #fff7f1;
-  --text-main: #3d2a1f;
+  --page-bg: radial-gradient(circle at top, #fff7f1 0%, #f4ebe2 62%, #efe4da 100%);
+  --text-main: #2f241d;
+  --text-muted: #746356;
   --accent: #ea580c;
   --accent-hover: #c2410c;
+  --surface: rgba(255, 252, 248, 0.92);
+  --surface-strong: #fffdfb;
+  --surface-border: #f0d6bf;
+  --danger: #c2410c;
+  --danger-bg: #fff1e8;
+  --success: #166534;
+  --success-bg: #ecfdf3;
+  --shadow-soft: 0 18px 45px rgba(65, 37, 18, 0.08);
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -20,80 +33,256 @@ body {
   background: var(--page-bg);
 }
 
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease;
+}
+
+button:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #d9c1ac;
+  border-radius: 12px;
+  background: #fffdfa;
+  color: var(--text-main);
+  padding: 0.85rem 0.95rem;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #e77735;
+  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.14);
+  background: #ffffff;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
 .app-shell {
   min-height: 100vh;
 }
 
 .top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
   background: var(--nav-bg);
   color: var(--nav-link);
+  box-shadow: 0 10px 30px rgba(83, 35, 9, 0.18);
 }
 
 .top-nav nav {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
 .top-nav a {
-  color: var(--nav-link);
   text-decoration: none;
+  padding: 0.55rem 0.75rem;
+  border-radius: 999px;
 }
 
 .top-nav a:hover {
-  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.top-nav button {
+  border-radius: 999px;
+  padding-inline: 1rem;
 }
 
 .page-container {
-  max-width: 900px;
+  width: min(1320px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 20px;
+  padding: 1.2rem 0 2rem;
 }
 
-form {
-  display: grid;
-  gap: 10px;
-  max-width: 500px;
+.card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 24px;
+  padding: 1.15rem;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(10px);
 }
 
-input,
-select,
-textarea,
-button {
-  padding: 10px;
-  font: inherit;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
 }
 
-button {
-  border: 1px solid var(--accent);
-  background: var(--accent);
+.section-header h2,
+.section-header h3 {
+  margin: 0;
+}
+
+.section-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ba4a1d;
+}
+
+.section-note {
+  max-width: 28rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f0ccb4;
+  border-radius: 999px;
+  background: #fff4ea;
+  color: #7b3417;
+  padding: 0.42rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.pill-strong {
+  background: #f1661a;
   color: #fff;
-  cursor: pointer;
+  border-color: #f1661a;
 }
 
-button:hover {
-  background: var(--accent-hover);
+.message-error,
+.message-success {
+  margin: 0.9rem 0 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  font-size: 0.95rem;
+}
+
+.message-error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid #f5c1a6;
+}
+
+.message-success {
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid #bfe9cc;
+}
+
+.button-secondary {
+  background: #fff2e8;
+  color: #8a3412;
+  border-color: #efc3a7;
+}
+
+.button-secondary:hover {
+  background: #ffe5d4;
+}
+
+.button-danger {
+  background: #fff0e6;
+  color: #b93815;
+  border-color: #f2b89b;
+}
+
+.button-danger:hover {
+  background: #ffe2d2;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.stacked-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.stacked-form label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.stacked-form label > span {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.compact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .map-container {
-  margin: 12px 0 20px;
-  border: 1px solid #fed7aa;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid #edd5c2;
+  border-radius: 20px;
+  background: #fbf4ed;
 }
 
 .map-view {
   width: 100%;
-  height: 420px;
-}
-
-li button {
-  margin-left: 8px;
+  height: 390px;
 }
 
 .tours-catalog-title {
-  margin-bottom: 20px;
+  margin-bottom: 1.2rem;
 }
 
 .tour-cards {
@@ -101,25 +290,25 @@ li button {
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
 }
 
 .tour-card {
-  background: #fff;
-  border: 1px solid #fed7aa;
-  border-radius: 10px;
-  padding: 14px;
-  box-shadow: 0 2px 8px rgba(20, 12, 6, 0.06);
+  background: #fffdfa;
+  border: 1px solid #f0d7c1;
+  border-radius: 18px;
+  padding: 1rem;
+  box-shadow: 0 10px 30px rgba(43, 27, 13, 0.06);
 }
 
 .tour-card-title {
   display: inline-block;
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #9a3412;
   text-decoration: none;
-  margin-bottom: 8px;
+  margin-bottom: 0.6rem;
 }
 
 .tour-card-title:hover {
@@ -127,5 +316,265 @@ li button {
 }
 
 .tour-card-meta {
-  margin: 6px 0;
+  margin: 0.35rem 0;
+  color: #5c483a;
+}
+
+.tour-details-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.tour-hero {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.2rem;
+}
+
+.tour-hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.02;
+}
+
+.tour-hero-description {
+  max-width: 60rem;
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+.tour-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.tour-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.95fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.tour-main-column,
+.tour-sidebar {
+  display: grid;
+  gap: 1rem;
+}
+
+.tour-sidebar {
+  position: sticky;
+  top: 88px;
+}
+
+.tour-map-card {
+  padding-bottom: 1.1rem;
+}
+
+.keypoints-list,
+.reviews-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.keypoint-card,
+.review-card {
+  border: 1px solid #efd7c5;
+  border-radius: 18px;
+  background: #fffdfa;
+  padding: 1rem;
+}
+
+.keypoint-head,
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.keypoint-head h3 {
+  margin: 0.1rem 0 0;
+}
+
+.keypoint-order {
+  margin: 0;
+  color: #b74a1b;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.keypoint-description,
+.review-meta,
+.keypoint-coordinates {
+  margin: 0.55rem 0 0;
+  color: var(--text-muted);
+}
+
+.stats-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.stats-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f1dfd1;
+}
+
+.stats-list div:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.stats-list dt {
+  color: var(--text-muted);
+}
+
+.stats-list dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.travel-times-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.travel-times-compact {
+  margin-top: 1rem;
+}
+
+.travel-time-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #f0dccb;
+  border-radius: 14px;
+  background: #fffdfa;
+  padding: 0.85rem 0.95rem;
+}
+
+.tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+}
+
+.empty-state,
+.empty-inline {
+  color: var(--text-muted);
+}
+
+.status-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.compact-card {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.control-panel {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.compact-stats div {
+  padding-bottom: 0.55rem;
+}
+
+.compact-form {
+  margin-top: 0.85rem;
+}
+
+.control-section {
+  border: 1px solid #f0dccb;
+  border-radius: 16px;
+  background: #fffdfa;
+  padding: 0.85rem 0.9rem;
+}
+
+.control-section summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  gap: 1rem;
+  list-style: none;
+}
+
+.control-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.control-section summary span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.control-section summary strong {
+  font-size: 1rem;
+}
+
+.three-col-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1080px) {
+  .tour-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tour-sidebar {
+    position: static;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .top-nav {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-container {
+    width: min(100% - 1rem, 1320px);
+    padding-top: 1rem;
+  }
+
+  .card {
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
+  .compact-grid,
+  .three-col-grid,
+  .tour-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header,
+  .keypoint-head,
+  .review-head {
+    flex-direction: column;
+  }
+
+  .map-view {
+    height: 320px;
+  }
 }

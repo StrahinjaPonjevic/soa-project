@@ -7,6 +7,7 @@ public class AppDbContext : DbContext
 {
     public DbSet<Tour> Tours => Set<Tour>();
     public DbSet<KeyPoint> KeyPoints => Set<KeyPoint>();
+    public DbSet<TourTravelTime> TourTravelTimes => Set<TourTravelTime>();
     public DbSet<TouristLocation> TouristLocations => Set<TouristLocation>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
@@ -38,6 +39,8 @@ public class AppDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(32);
 
+            entity.Property(t => t.LengthKm);
+
             entity.Property(t => t.Tags)
                 .HasColumnType("text[]");
 
@@ -46,6 +49,11 @@ public class AppDbContext : DbContext
             entity.HasMany(t => t.KeyPoints)
                 .WithOne(k => k.Tour)
                 .HasForeignKey(k => k.TourId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(t => t.TravelTimes)
+                .WithOne(tt => tt.Tour)
+                .HasForeignKey(tt => tt.TourId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -64,6 +72,16 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(k => k.TourId);
             entity.HasIndex(k => new { k.TourId, k.OrderIndex }).IsUnique();
+        });
+
+        modelBuilder.Entity<TourTravelTime>(entity =>
+        {
+            entity.Property(tt => tt.TransportType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            entity.HasIndex(tt => tt.TourId);
+            entity.HasIndex(tt => new { tt.TourId, tt.TransportType }).IsUnique();
         });
 
         modelBuilder.Entity<TouristLocation>(entity =>

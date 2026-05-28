@@ -13,6 +13,10 @@ public class TourResponseDto
     public string[] Tags { get; set; } = Array.Empty<string>();
     public TourStatus Status { get; set; }
     public decimal Price { get; set; }
+    public double LengthKm { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime? PublishedAtUtc { get; set; }
+    public DateTime? ArchivedAtUtc { get; set; }
     public IReadOnlyList<KeyPointResponseDto> KeyPoints { get; set; } = Array.Empty<KeyPointResponseDto>();
+    public IReadOnlyList<TourTravelTimeDto> TravelTimes { get; set; } = Array.Empty<TourTravelTimeDto>();
 }

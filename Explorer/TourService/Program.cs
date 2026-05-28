@@ -50,6 +50,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection(MongoDbSettings.SectionName));
+builder.Services.Configure<MapRoutingSettings>(
+    builder.Configuration.GetSection(MapRoutingSettings.SectionName));
 builder.Services.AddSingleton<IMongoClient>(_ =>
 {
     var settings = builder.Configuration
@@ -78,6 +80,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITourReviewRepository, MongoTourReviewRepository>();
+builder.Services.AddScoped<ITourManagementService, TourManagementService>();
+builder.Services.AddHttpClient<IMapRoutingClient, OsrmMapRoutingClient>((serviceProvider, client) =>
+{
+    var settings = serviceProvider
+        .GetRequiredService<IConfiguration>()
+        .GetSection(MapRoutingSettings.SectionName)
+        .Get<MapRoutingSettings>() ?? new MapRoutingSettings();
+
+    client.BaseAddress = new Uri(settings.BaseUrl);
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>
