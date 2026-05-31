@@ -9,6 +9,7 @@ import { CreateTourPage } from '../pages/CreateTourPage'
 import { TourDetailsPage } from '../pages/TourDetailsPage'
 import { SimulatorPage } from '../pages/SimulatorPage'
 import { ToursCatalogPage } from '../pages/ToursCatalogPage'
+import { ActiveTourPage } from '../pages/ActiveTourPage'
 
 export function AppRouter() {
   return (
@@ -58,6 +59,14 @@ export function AppRouter() {
               element={
                 <ProtectedRoute>
                   <SimulatorPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tours/executions/:executionId"
+              element={
+                <ProtectedRoute>
+                  <ActiveTourPage />
                 </ProtectedRoute>
               }
             />

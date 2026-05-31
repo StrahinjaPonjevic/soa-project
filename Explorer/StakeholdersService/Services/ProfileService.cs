@@ -47,6 +47,30 @@ namespace StakeholdersService.Services
             return MapToResponse(profile);
         }
 
+        // Called by StartTour SAGA (step 2) — records which execution is active for this tourist
+        public async Task<bool> SetActiveTourExecutionAsync(int userId, int executionId)
+        {
+            var profile = await _context.Profiles.FindByUserIdAsync(userId);
+            if (profile is null) return false;
+
+            if (profile.ActiveTourExecutionId.HasValue)
+                return false; // Tourist already has an active tour recorded
+
+            profile.ActiveTourExecutionId = executionId;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // Called as SAGA compensation or when tour ends
+        public async Task ClearActiveTourExecutionAsync(int userId)
+        {
+            var profile = await _context.Profiles.FindByUserIdAsync(userId);
+            if (profile is null) return;
+
+            profile.ActiveTourExecutionId = null;
+            await _context.SaveChangesAsync();
+        }
+
         private static ProfileResponseDto MapToResponse(Profile p) => new()
         {
             UserId = p.UserId,

@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getTours } from '../api/tourApi'
+import { Link, useNavigate } from 'react-router-dom'
+import { getTours, startTour, getActiveTourExecution } from '../api/tourApi'
 import type { TourResponse } from '../shared/types/tour'
+import { useAuth } from '../features/auth/AuthContext'
+import { parseAuthUser } from '../shared/auth'
 
 export function ToursCatalogPage() {
+  const { token } = useAuth()
+  const authUser = parseAuthUser(token)
+  const navigate = useNavigate()
+
   const [tours, setTours] = useState<TourResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [startingId, setStartingId] = useState<number | null>(null)
+  const [startError, setStartError] = useState<string | null>(null)
+  const [activeExecutionId, setActiveExecutionId] = useState<number | null>(null)
 
   useEffect(() => {
     const run = async () => {
@@ -24,12 +33,46 @@ export function ToursCatalogPage() {
     void run()
   }, [])
 
+  const handleStartTour = async (tourId: number) => {
+    setStartError(null)
+    setStartingId(tourId)
+    try {
+      const execution = await startTour(tourId)
+      navigate(`/tours/executions/${execution.id}`)
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        // Already has an active execution — find it and offer to navigate
+        try {
+          const active = await getActiveTourExecution()
+          setActiveExecutionId(active.id)
+          setStartError(null)
+        } catch {
+          setStartError('You already have an active tour. Please complete or abandon it first.')
+        }
+      } else {
+        const msg = err?.response?.data?.message ?? 'Failed to start tour.'
+        setStartError(msg)
+      }
+    } finally {
+      setStartingId(null)
+    }
+  }
+
   if (loading) return <p>Loading tours...</p>
 
   return (
     <section className="tours-catalog">
       <h1 className="tours-catalog-title">All Tours</h1>
-      {error && <p>{error}</p>}
+      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      {startError && <p style={{ color: 'var(--danger)' }}>{startError}</p>}
+      {activeExecutionId && (
+        <div className="tour-notification" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span>You already have an active tour.</span>
+          <Link to={`/tours/executions/${activeExecutionId}`} style={{ fontWeight: 700 }}>
+            Resume →
+          </Link>
+        </div>
+      )}
       {tours.length === 0 ? (
         <p>No tours available yet.</p>
       ) : (
@@ -48,6 +91,16 @@ export function ToursCatalogPage() {
               <p className="tour-card-meta">
                 Status: <strong>{tour.status}</strong> | Price: <strong>{tour.price}</strong>
               </p>
+              {authUser.role === 'Tourist' && (
+                <button
+                  type="button"
+                  onClick={() => void handleStartTour(tour.id)}
+                  disabled={startingId === tour.id}
+                  style={{ marginTop: '0.5rem', background: 'var(--accent)' }}
+                >
+                  {startingId === tour.id ? 'Starting...' : 'Start Tour'}
+                </button>
+              )}
             </li>
           ))}
         </ul>

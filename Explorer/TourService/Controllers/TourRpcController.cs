@@ -1,27 +1,32 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TourService.DTOs;
+using TourService.Models;
 using TourService.Services;
 
 namespace TourService.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Guide")]
 [Route("internal/rpc")]
 public class TourRpcController : ControllerBase
 {
     private readonly ICurrentUserService _currentUserService;
     private readonly ITourManagementService _tourManagementService;
+    private readonly ITourExecutionService _tourExecutionService;
 
     public TourRpcController(
         ICurrentUserService currentUserService,
-        ITourManagementService tourManagementService)
+        ITourManagementService tourManagementService,
+        ITourExecutionService tourExecutionService)
     {
         _currentUserService = currentUserService;
         _tourManagementService = tourManagementService;
+        _tourExecutionService = tourExecutionService;
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Execute([FromBody] JsonRpcRequest request, CancellationToken cancellationToken)
     {
         if (!_currentUserService.TryGetCurrentUser(User, out var currentUser))
@@ -37,16 +42,39 @@ public class TourRpcController : ControllerBase
                     request.Id,
                     ToursController.ToAuthorResponse(
                         await _tourManagementService.PublishAsync(
-                            ExtractTourId(request.Params),
+                            ExtractParam<int>(request.Params, "tourId"),
                             currentUser!,
                             cancellationToken)))),
+
                 "TourService.ArchiveTour" => Ok(JsonRpcResponse.Success(
                     request.Id,
                     ToursController.ToAuthorResponse(
                         await _tourManagementService.ArchiveAsync(
-                            ExtractTourId(request.Params),
+                            ExtractParam<int>(request.Params, "tourId"),
                             currentUser!,
                             cancellationToken)))),
+
+                // RPC 1: Tourist starts a tour — creates TourExecution
+                "TourExecutionService.StartTour" => Ok(JsonRpcResponse.Success(
+                    request.Id,
+                    ToExecutionDto(
+                        await _tourExecutionService.StartTourAsync(
+                            ExtractParam<int>(request.Params, "tourId"),
+                            currentUser!.UserId,
+                            cancellationToken)))),
+
+                // RPC 2: Check if tourist is near an uncompleted key point
+                "TourExecutionService.CheckNearbyKeyPoint" => Ok(JsonRpcResponse.Success(
+                    request.Id,
+                    ToCheckNearbyDto(
+                        await _tourExecutionService.CheckNearbyKeyPointAsync(
+                            ExtractParam<int>(request.Params, "executionId"),
+                            currentUser!.UserId,
+                            cancellationToken)))),
+
+                // Compensation RPC — called by SAGA orchestrator to roll back StartTour
+                "TourExecutionService.CancelExecution" => await HandleCancelAsync(request, cancellationToken),
+
                 _ => Ok(JsonRpcResponse.Failure(request.Id, 404, $"Unknown RPC method '{request.Method}'."))
             };
         }
@@ -56,16 +84,63 @@ public class TourRpcController : ControllerBase
         }
     }
 
-    private static int ExtractTourId(JsonElement? parameters)
+    private async Task<IActionResult> HandleCancelAsync(JsonRpcRequest request, CancellationToken ct)
     {
-        if (parameters is null ||
-            !parameters.Value.TryGetProperty("tourId", out var tourIdElement) ||
-            !tourIdElement.TryGetInt32(out var tourId))
+        await _tourExecutionService.CancelAsync(
+            ExtractParam<int>(request.Params, "executionId"),
+            ct);
+        return Ok(JsonRpcResponse.Success(request.Id, new { cancelled = true }));
+    }
+
+    private static T ExtractParam<T>(JsonElement? parameters, string name) where T : struct
+    {
+        if (parameters is null || !parameters.Value.TryGetProperty(name, out var element))
+            throw new TourOperationException(400, $"RPC parameter '{name}' is required.");
+
+        if (typeof(T) == typeof(int))
         {
-            throw new TourOperationException(400, "RPC parameter 'tourId' is required.");
+            if (!element.TryGetInt32(out var intVal))
+                throw new TourOperationException(400, $"RPC parameter '{name}' must be an integer.");
+            return (T)(object)intVal;
         }
 
-        return tourId;
+        throw new TourOperationException(400, $"Unsupported parameter type for '{name}'.");
+    }
+
+    internal static TourExecutionResponseDto ToExecutionDto(TourExecution e)
+    {
+        return new TourExecutionResponseDto
+        {
+            Id = e.Id,
+            TourId = e.TourId,
+            TouristId = e.TouristId,
+            Status = e.Status.ToString(),
+            StartedAtUtc = e.StartedAtUtc,
+            CompletedAtUtc = e.CompletedAtUtc,
+            AbandonedAtUtc = e.AbandonedAtUtc,
+            LastActivityAtUtc = e.LastActivityAtUtc,
+            InitialLatitude = e.InitialLatitude,
+            InitialLongitude = e.InitialLongitude,
+            CompletedKeyPoints = e.CompletedKeyPoints
+                .Select(ckp => new CompletedKeyPointDto
+                {
+                    KeyPointId = ckp.KeyPointId,
+                    CompletedAtUtc = ckp.CompletedAtUtc
+                })
+                .ToList()
+        };
+    }
+
+    internal static CheckNearbyResponseDto ToCheckNearbyDto(CheckNearbyResult result)
+    {
+        return new CheckNearbyResponseDto
+        {
+            IsNearKeyPoint = result.IsNearKeyPoint,
+            KeyPointId = result.KeyPointId,
+            KeyPointName = result.KeyPointName,
+            IsNewlyCompleted = result.IsNewlyCompleted,
+            Execution = ToExecutionDto(result.Execution)
+        };
     }
 
     public sealed class JsonRpcRequest

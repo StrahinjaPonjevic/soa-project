@@ -81,6 +81,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITourReviewRepository, MongoTourReviewRepository>();
 builder.Services.AddScoped<ITourManagementService, TourManagementService>();
+builder.Services.AddScoped<ITourExecutionService, TourExecutionService>();
 builder.Services.AddHttpClient<IMapRoutingClient, OsrmMapRoutingClient>((serviceProvider, client) =>
 {
     var settings = serviceProvider
@@ -105,7 +106,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 if (app.Environment.IsDevelopment())

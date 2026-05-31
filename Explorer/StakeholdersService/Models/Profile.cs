@@ -13,4 +13,7 @@ public class Profile
     public string? Biography { get; set; }
 
     public string? Motto { get; set; }
+
+    // Set by StartTour SAGA; cleared when execution ends
+    public int? ActiveTourExecutionId { get; set; }
 }

@@ -78,7 +78,7 @@ public class ToursController : ControllerBase
             .AsNoTracking()
             .Include(t => t.KeyPoints)
             .Include(t => t.TravelTimes)
-            .Where(t => t.Status == TourStatus.Published)
+            .Where(t => t.Status == TourStatus.Published || t.Status == TourStatus.Archived)
             .OrderByDescending(t => t.PublishedAtUtc ?? t.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -106,7 +106,7 @@ public class ToursController : ControllerBase
             return Ok(ToAuthorResponse(tour));
         }
 
-        if (tour.Status != TourStatus.Published)
+        if (tour.Status != TourStatus.Published && tour.Status != TourStatus.Archived)
         {
             return NotFound();
         }
@@ -177,7 +177,7 @@ public class ToursController : ControllerBase
 
         var currentUser = GetCurrentUserOrNull();
         var isOwner = currentUser is not null && currentUser.UserId == tour.AuthorId;
-        if (!isOwner && tour.Status != TourStatus.Published)
+        if (!isOwner && tour.Status != TourStatus.Published && tour.Status != TourStatus.Archived)
         {
             return NotFound("Tour not found.");
         }

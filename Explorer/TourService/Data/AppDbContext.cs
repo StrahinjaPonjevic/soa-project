@@ -9,6 +9,8 @@ public class AppDbContext : DbContext
     public DbSet<KeyPoint> KeyPoints => Set<KeyPoint>();
     public DbSet<TourTravelTime> TourTravelTimes => Set<TourTravelTime>();
     public DbSet<TouristLocation> TouristLocations => Set<TouristLocation>();
+    public DbSet<TourExecution> TourExecutions => Set<TourExecution>();
+    public DbSet<CompletedKeyPoint> CompletedKeyPoints => Set<CompletedKeyPoint>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -87,6 +89,27 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TouristLocation>(entity =>
         {
             entity.HasIndex(tl => tl.TouristId).IsUnique();
+        });
+
+        modelBuilder.Entity<TourExecution>(entity =>
+        {
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            entity.HasIndex(e => e.TouristId);
+            entity.HasIndex(e => e.TourId);
+
+            entity.HasMany(e => e.CompletedKeyPoints)
+                .WithOne(ckp => ckp.TourExecution)
+                .HasForeignKey(ckp => ckp.TourExecutionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompletedKeyPoint>(entity =>
+        {
+            entity.HasIndex(ckp => ckp.TourExecutionId);
+            entity.HasIndex(ckp => new { ckp.TourExecutionId, ckp.KeyPointId }).IsUnique();
         });
     }
 }

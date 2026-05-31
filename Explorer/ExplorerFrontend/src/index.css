@@ -578,3 +578,95 @@ textarea {
     height: 320px;
   }
 }
+
+/* ── Active Tour page ─────────────────────────────────────────────────────── */
+
+.active-tour-meta {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.tour-notification {
+  background: var(--success-bg);
+  border: 1px solid #86efac;
+  color: var(--success);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.nearby-status {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.nearby-none {
+  color: var(--text-muted);
+}
+
+.keypoints-list {
+  margin-top: 1rem;
+}
+
+.keypoints-list h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.keypoints-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.keypoint-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.keypoint-done {
+  border-color: #86efac;
+  background: var(--success-bg);
+}
+
+.keypoint-marker {
+  font-weight: 700;
+  color: var(--accent);
+  width: 1.2rem;
+  text-align: center;
+}
+
+.keypoint-done .keypoint-marker {
+  color: var(--success);
+}
+
+.keypoint-name {
+  flex: 1;
+}
+
+.keypoint-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

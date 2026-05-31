@@ -29,6 +29,9 @@ namespace StakeholdersService.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ActiveTourExecutionId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Biography")
                         .HasColumnType("text");
 

@@ -161,3 +161,79 @@ export async function setMyTouristLocation(payload: { latitude: number; longitud
   const response = await tourHttpClient.put<TouristLocationResponse>('/api/tours/me/location', payload)
   return response.data
 }
+
+// ── TourExecution ─────────────────────────────────────────────────────────────
+
+export type CompletedKeyPointResponse = {
+  keyPointId: number
+  completedAtUtc: string
+}
+
+export type TourExecutionResponse = {
+  id: number
+  tourId: number
+  touristId: number
+  status: 'Active' | 'Completed' | 'Abandoned' | 'Cancelled'
+  startedAtUtc: string
+  completedAtUtc?: string | null
+  abandonedAtUtc?: string | null
+  lastActivityAtUtc: string
+  initialLatitude: number
+  initialLongitude: number
+  completedKeyPoints: CompletedKeyPointResponse[]
+}
+
+export type CheckNearbyResponse = {
+  isNearKeyPoint: boolean
+  keyPointId?: number | null
+  keyPointName?: string | null
+  isNewlyCompleted: boolean
+  execution: TourExecutionResponse
+}
+
+// RPC 1 (via gateway SAGA): starts a tour, creates TourExecution
+export async function startTour(tourId: number) {
+  const response = await tourHttpClient.post<TourExecutionResponse>(`/api/tours/${tourId}/start`)
+  return response.data
+}
+
+// RPC 2 (via gateway JSON-RPC): checks if tourist is within 200 m of a key point
+export async function checkNearbyKeyPoint(executionId: number) {
+  const response = await tourHttpClient.post<CheckNearbyResponse>(
+    `/api/tours/executions/${executionId}/check-nearby`,
+  )
+  return response.data
+}
+
+export async function completeTour(executionId: number) {
+  const response = await tourHttpClient.post<TourExecutionResponse>(
+    `/api/tours/executions/${executionId}/complete`,
+  )
+  return response.data
+}
+
+export async function abandonTour(executionId: number) {
+  const response = await tourHttpClient.post<TourExecutionResponse>(
+    `/api/tours/executions/${executionId}/abandon`,
+  )
+  return response.data
+}
+
+export async function getTourExecution(executionId: number) {
+  const response = await tourHttpClient.get<TourExecutionResponse>(
+    `/api/tours/executions/${executionId}`,
+  )
+  return response.data
+}
+
+export async function getExecutionKeyPoints(executionId: number) {
+  const response = await tourHttpClient.get<KeyPointResponse[]>(
+    `/api/tours/executions/${executionId}/keypoints`,
+  )
+  return response.data
+}
+
+export async function getActiveTourExecution() {
+  const response = await tourHttpClient.get<TourExecutionResponse>('/api/tours/executions/active')
+  return response.data
+}

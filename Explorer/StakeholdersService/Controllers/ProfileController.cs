@@ -56,6 +56,39 @@ public class ProfileController : ControllerBase
         return Ok(updated);
     }
 
+    // Internal endpoint — called by ApiGateway StartTour SAGA (step 2)
+    [HttpPost("internal/active-tour")]
+    public async Task<IActionResult> SetActiveTour(
+        [FromBody] ActiveTourDto dto,
+        [FromHeader(Name = "X-Internal-Api-Key")] string? apiKey,
+        [FromServices] IConfiguration config)
+    {
+        var expectedKey = config["InternalApiKey"];
+        if (string.IsNullOrEmpty(apiKey) || apiKey != expectedKey)
+            return Unauthorized("Invalid internal API key");
+
+        var success = await _profileService.SetActiveTourExecutionAsync(dto.UserId, dto.ExecutionId);
+        if (!success)
+            return Conflict("Tourist already has an active tour execution recorded.");
+
+        return Ok(new { dto.UserId, dto.ExecutionId });
+    }
+
+    // Internal endpoint — called by SAGA compensation or when tour ends
+    [HttpDelete("internal/active-tour")]
+    public async Task<IActionResult> ClearActiveTour(
+        [FromBody] ClearActiveTourDto dto,
+        [FromHeader(Name = "X-Internal-Api-Key")] string? apiKey,
+        [FromServices] IConfiguration config)
+    {
+        var expectedKey = config["InternalApiKey"];
+        if (string.IsNullOrEmpty(apiKey) || apiKey != expectedKey)
+            return Unauthorized("Invalid internal API key");
+
+        await _profileService.ClearActiveTourExecutionAsync(dto.UserId);
+        return NoContent();
+    }
+
     private int? GetCurrentUserId()
     {
         // Čitamo custom "userId" claim koji Auth servis upisuje u token
@@ -63,3 +96,6 @@ public class ProfileController : ControllerBase
         return int.TryParse(userIdClaim, out var id) ? id : null;
     }
 }
+
+public record ActiveTourDto(int UserId, int ExecutionId);
+public record ClearActiveTourDto(int UserId);

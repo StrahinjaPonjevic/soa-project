@@ -60,7 +60,10 @@ func JWTAuth() gin.HandlerFunc {
 			return
 		}
 
+		username, _ := claims["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"].(string)
+
 		c.Set("userId", userID)
+		c.Set("username", username)
 		c.Next()
 	}
 }
