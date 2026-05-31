@@ -9,13 +9,15 @@ public class TourExecutionService : ITourExecutionService
     private const double ProximityThresholdKm = 0.2;
 
     private readonly AppDbContext _context;
+    private readonly IPurchaseAccessService _purchaseAccessService;
 
-    public TourExecutionService(AppDbContext context)
+    public TourExecutionService(AppDbContext context, IPurchaseAccessService purchaseAccessService)
     {
         _context = context;
+        _purchaseAccessService = purchaseAccessService;
     }
 
-    public async Task<TourExecution> StartTourAsync(int tourId, int touristId, CancellationToken ct)
+    public async Task<TourExecution> StartTourAsync(int tourId, int touristId, string authorizationHeader, CancellationToken ct)
     {
         var tour = await _context.Tours
             .AsNoTracking()
@@ -26,6 +28,10 @@ public class TourExecutionService : ITourExecutionService
 
         if (tour.Status != TourStatus.Published && tour.Status != TourStatus.Archived)
             throw new TourOperationException(400, "Only published or archived tours can be started.");
+
+        var hasPurchased = await _purchaseAccessService.HasPurchasedTourAsync(tourId, authorizationHeader, ct);
+        if (!hasPurchased)
+            throw new TourOperationException(403, "Tour must be purchased before it can be started.");
 
         var existing = await _context.TourExecutions
             .AsNoTracking()

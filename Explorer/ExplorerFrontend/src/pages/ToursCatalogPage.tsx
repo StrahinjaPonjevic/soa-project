@@ -15,7 +15,6 @@ export function ToursCatalogPage() {
   const [error, setError] = useState<string | null>(null)
   const [startingId, setStartingId] = useState<number | null>(null)
   const [startError, setStartError] = useState<string | null>(null)
-  const [activeExecutionId, setActiveExecutionId] = useState<number | null>(null)
 
   useEffect(() => {
     const run = async () => {
@@ -41,13 +40,13 @@ export function ToursCatalogPage() {
       navigate(`/tours/executions/${execution.id}`)
     } catch (err: any) {
       if (err?.response?.status === 409) {
-        // Already has an active execution — find it and offer to navigate
+        // Already has an active execution — navigate directly to it
         try {
           const active = await getActiveTourExecution()
-          setActiveExecutionId(active.id)
-          setStartError(null)
+          navigate(`/tours/executions/${active.id}`)
         } catch {
-          setStartError('You already have an active tour. Please complete or abandon it first.')
+          // Fallback: navigate to a dummy ID, ActiveTourPage will redirect to real active one
+          navigate('/tours/executions/0')
         }
       } else {
         const msg = err?.response?.data?.message ?? 'Failed to start tour.'
@@ -65,14 +64,6 @@ export function ToursCatalogPage() {
       <h1 className="tours-catalog-title">All Tours</h1>
       {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
       {startError && <p style={{ color: 'var(--danger)' }}>{startError}</p>}
-      {activeExecutionId && (
-        <div className="tour-notification" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span>You already have an active tour.</span>
-          <Link to={`/tours/executions/${activeExecutionId}`} style={{ fontWeight: 700 }}>
-            Resume →
-          </Link>
-        </div>
-      )}
       {tours.length === 0 ? (
         <p>No tours available yet.</p>
       ) : (

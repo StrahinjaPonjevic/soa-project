@@ -227,17 +227,10 @@ func (g *gatewayHandler) startTourSaga(w http.ResponseWriter, r *http.Request, t
 	}
 
 	// ── Step 2: StakeholdersService — record active execution on tourist profile
+	// Non-critical: if this fails we log it but do NOT roll back the execution.
+	// TourService is the authoritative source of truth for execution state.
 	if err := g.setActiveTourOnProfile(r, execution.TouristId, execution.Id); err != nil {
-		log.Printf("SAGA StartTour step2 failed (executionId=%d): %v", execution.Id, err)
-
-		if compErr := g.compensateCancelExecution(r, execution.Id); compErr != nil {
-			log.Printf("SAGA compensation failed (executionId=%d): %v", execution.Id, compErr)
-			writeJSONError(w, http.StatusBadGateway, "start tour failed and compensation did not succeed")
-			return
-		}
-
-		writeJSONError(w, http.StatusConflict, "start tour failed; execution rolled back")
-		return
+		log.Printf("SAGA StartTour step2 non-critical failure (executionId=%d): %v — continuing", execution.Id, err)
 	}
 
 	// ── SAGA complete — return execution to client ────────────────────────────

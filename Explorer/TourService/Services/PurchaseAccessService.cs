@@ -35,7 +35,7 @@ public class PurchaseAccessService : IPurchaseAccessService
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        var payload = await JsonSerializer.DeserializeAsync<PurchaseExistsResponse>(stream, cancellationToken: ct);
+        var payload = await JsonSerializer.DeserializeAsync<PurchaseExistsResponse>(stream, _jsonOptions, ct);
         return payload?.Purchased ?? false;
     }
 
@@ -60,10 +60,15 @@ public class PurchaseAccessService : IPurchaseAccessService
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        var payload = await JsonSerializer.DeserializeAsync<PurchaseTokensResponse>(stream, cancellationToken: ct);
+        var payload = await JsonSerializer.DeserializeAsync<PurchaseTokensResponse>(stream, _jsonOptions, ct);
         var ids = payload?.Tokens?.Select(t => t.TourId).ToHashSet() ?? new HashSet<int>();
         return ids;
     }
+
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private sealed class PurchaseExistsResponse
     {

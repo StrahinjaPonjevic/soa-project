@@ -61,6 +61,7 @@ public class TourRpcController : ControllerBase
                         await _tourExecutionService.StartTourAsync(
                             ExtractParam<int>(request.Params, "tourId"),
                             currentUser!.UserId,
+                            Request.Headers.Authorization.ToString(),
                             cancellationToken)))),
 
                 // RPC 2: Check if tourist is near an uncompleted key point

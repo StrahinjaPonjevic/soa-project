@@ -4,7 +4,7 @@ namespace TourService.Services;
 
 public interface ITourExecutionService
 {
-    Task<TourExecution> StartTourAsync(int tourId, int touristId, CancellationToken ct);
+    Task<TourExecution> StartTourAsync(int tourId, int touristId, string authorizationHeader, CancellationToken ct);
     Task<CheckNearbyResult> CheckNearbyKeyPointAsync(int executionId, int touristId, CancellationToken ct);
     Task<TourExecution> CompleteAsync(int executionId, int touristId, CancellationToken ct);
     Task<TourExecution> AbandonAsync(int executionId, int touristId, CancellationToken ct);
