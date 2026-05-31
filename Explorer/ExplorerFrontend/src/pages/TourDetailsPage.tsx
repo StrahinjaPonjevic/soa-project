@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { Link } from 'react-router-dom'
 import { useParams } from 'react-router-dom'
 import { MapContainer, Marker, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
 import type { LeafletMouseEvent } from 'leaflet'
@@ -21,6 +22,8 @@ import { useAuth } from '../features/auth/AuthContext'
 import { parseAuthUser } from '../shared/auth'
 import type { TourReviewResponse } from '../shared/types/review'
 import type { RoutePointResponse, TourResponse } from '../shared/types/tour'
+import { addToCart, hasPurchaseToken } from '../api/purchaseApi'
+import './TourDetailsPage.purchase.css'
 
 type TourBasicsForm = {
   name: string
@@ -120,6 +123,10 @@ export function TourDetailsPage() {
   const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null)
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null)
+  const [purchaseError, setPurchaseError] = useState<string | null>(null)
+  const [alreadyPurchased, setAlreadyPurchased] = useState(false)
+  const [addingToCart, setAddingToCart] = useState(false)
   const [editingKeyPointId, setEditingKeyPointId] = useState<number | null>(null)
   const [selectedMapPosition, setSelectedMapPosition] = useState<[number, number] | null>(null)
   const tourBasicsForm = useForm<TourBasicsForm>()
@@ -160,14 +167,17 @@ export function TourDetailsPage() {
 
     try {
       setError(null)
-      const [loadedTour, loadedReviews, loadedRoutePreview] = await Promise.all([
-        getTourById(tourId),
-        getTourReviews(tourId),
-        getTourRoutePreview(tourId),
-      ])
+      const [loadedTour, loadedReviews] = await Promise.all([getTourById(tourId), getTourReviews(tourId)])
       setTour(loadedTour)
       setReviews(loadedReviews)
-      setRoutePreview(loadedRoutePreview)
+
+      // Route preview should not block tour details rendering.
+      try {
+        const loadedRoutePreview = await getTourRoutePreview(tourId)
+        setRoutePreview(loadedRoutePreview)
+      } catch {
+        setRoutePreview([])
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load tour details.'))
     } finally {
@@ -179,6 +189,30 @@ export function TourDetailsPage() {
     void loadTourDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  useEffect(() => {
+    const run = async () => {
+      if (!id || Number.isNaN(tourId) || authUser.role !== 'Tourist' || !tour) {
+        return
+      }
+
+      // Purchase token check is only relevant for purchasable tours.
+      if (tour.status !== 'Published') {
+        setAlreadyPurchased(false)
+        return
+      }
+
+      try {
+        const purchased = await hasPurchaseToken(tourId)
+        setAlreadyPurchased(purchased)
+      } catch {
+        setAlreadyPurchased(false)
+      }
+    }
+
+    void run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, authUser.role, tour?.status])
 
   const sortedKeyPoints = useMemo(() => {
     if (!tour) {
@@ -235,6 +269,7 @@ export function TourDetailsPage() {
 
   const canManageTour = authUser.role === 'Guide' && authUser.userId === tour.authorId
   const canReview = authUser.role === 'Tourist' && tour.status === 'Published'
+  const canAddToCart = authUser.role === 'Tourist' && tour.status === 'Published' && !alreadyPurchased
   const routePositions =
     routePreview.length >= 2
       ? routePreview.map((point) => [point.latitude, point.longitude] as [number, number])
@@ -435,6 +470,20 @@ export function TourDetailsPage() {
       setReviewError(getErrorMessage(err, 'Failed to create review.'))
     }
   })
+
+  const handleAddToCart = async () => {
+    try {
+      setPurchaseError(null)
+      setPurchaseMessage(null)
+      setAddingToCart(true)
+      await addToCart(tour.id)
+      setPurchaseMessage('Tour added to cart.')
+    } catch (err) {
+      setPurchaseError(getErrorMessage(err, 'Failed to add tour to cart.'))
+    } finally {
+      setAddingToCart(false)
+    }
+  }
 
   return (
     <section className="tour-details-page">
@@ -638,6 +687,25 @@ export function TourDetailsPage() {
             <div className="tags-row">
               {tour.tags.length > 0 ? tour.tags.map((tag) => <span key={tag} className="pill">{tag}</span>) : <span className="empty-inline">No tags</span>}
             </div>
+
+            {authUser.role === 'Tourist' && (
+              <div className="purchase-actions">
+                {alreadyPurchased ? (
+                  <p className="message-success">You already purchased this tour.</p>
+                ) : canAddToCart ? (
+                  <div className="inline-actions">
+                    <button type="button" onClick={() => void handleAddToCart()} disabled={addingToCart}>
+                      {addingToCart ? 'Adding...' : 'Add to cart'}
+                    </button>
+                    <Link to="/purchases/cart">Open cart</Link>
+                  </div>
+                ) : (
+                  <p className="empty-inline">Only published tours can be purchased.</p>
+                )}
+                {purchaseError && <p className="message-error">{purchaseError}</p>}
+                {purchaseMessage && <p className="message-success">{purchaseMessage}</p>}
+              </div>
+            )}
 
             <div className="travel-times-list travel-times-compact">
               {tour.travelTimes.length === 0 ? (

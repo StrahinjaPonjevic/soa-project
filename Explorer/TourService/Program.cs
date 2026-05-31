@@ -82,6 +82,12 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITourReviewRepository, MongoTourReviewRepository>();
 builder.Services.AddScoped<ITourManagementService, TourManagementService>();
 builder.Services.AddScoped<ITourExecutionService, TourExecutionService>();
+builder.Services.AddHttpClient<IPurchaseAccessService, PurchaseAccessService>((serviceProvider, client) =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var baseUrl = config["PurchaseService:BaseUrl"] ?? "http://purchase_service:8080";
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/'));
+});
 builder.Services.AddHttpClient<IMapRoutingClient, OsrmMapRoutingClient>((serviceProvider, client) =>
 {
     var settings = serviceProvider

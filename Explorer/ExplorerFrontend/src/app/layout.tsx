@@ -19,6 +19,8 @@ export function AppLayout() {
           <Link to="/tours">All Tours</Link>
           {authUser.role === 'Guide' && <Link to="/tours/me">My Tours</Link>}
           {authUser.role === 'Guide' && <Link to="/tours/new">Create Tour</Link>}
+          {authUser.role === 'Tourist' && <Link to="/purchases/cart">Cart</Link>}
+          {authUser.role === 'Tourist' && <Link to="/purchases/tokens">My Purchases</Link>}
           <Link to="/simulator">Simulator</Link>
         </nav>
         <div>

@@ -16,17 +16,20 @@ public class ToursController : ControllerBase
     private readonly ICurrentUserService _currentUserService;
     private readonly ITourManagementService _tourManagementService;
     private readonly ITourReviewRepository _tourReviewRepository;
+    private readonly IPurchaseAccessService _purchaseAccessService;
 
     public ToursController(
         AppDbContext context,
         ICurrentUserService currentUserService,
         ITourManagementService tourManagementService,
-        ITourReviewRepository tourReviewRepository)
+        ITourReviewRepository tourReviewRepository,
+        IPurchaseAccessService purchaseAccessService)
     {
         _context = context;
         _currentUserService = currentUserService;
         _tourManagementService = tourManagementService;
         _tourReviewRepository = tourReviewRepository;
+        _purchaseAccessService = purchaseAccessService;
     }
 
     [Authorize(Roles = "Guide")]
@@ -82,7 +85,15 @@ public class ToursController : ControllerBase
             .OrderByDescending(t => t.PublishedAtUtc ?? t.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        return Ok(tours.Select(ToPublicResponse).ToList());
+        var currentUser = GetCurrentUserOrNull();
+        if (currentUser is null || !IsTourist())
+        {
+            return Ok(tours.Select(ToPublicResponse).ToList());
+        }
+
+        var authHeader = Request.Headers.Authorization.ToString();
+        var purchasedIds = await _purchaseAccessService.GetPurchasedTourIdsAsync(authHeader, cancellationToken);
+        return Ok(tours.Select(t => ToResponse(t, purchasedIds.Contains(t.Id))).ToList());
     }
 
     [HttpGet("{id:int}")]
@@ -111,7 +122,14 @@ public class ToursController : ControllerBase
             return NotFound();
         }
 
-        return Ok(ToPublicResponse(tour));
+        var includeAllKeyPoints = false;
+        if (currentUser is not null && IsTourist())
+        {
+            var authHeader = Request.Headers.Authorization.ToString();
+            includeAllKeyPoints = await _purchaseAccessService.HasPurchasedTourAsync(id, authHeader, cancellationToken);
+        }
+
+        return Ok(ToResponse(tour, includeAllKeyPoints));
     }
 
     [Authorize(Roles = "Guide")]
@@ -190,7 +208,17 @@ public class ToursController : ControllerBase
 
         if (!isOwner && keyPoints.Count > 1)
         {
-            keyPoints = keyPoints.Take(1).ToList();
+            var includeAll = false;
+            if (currentUser is not null && IsTourist())
+            {
+                var authHeader = Request.Headers.Authorization.ToString();
+                includeAll = await _purchaseAccessService.HasPurchasedTourAsync(tourId, authHeader, cancellationToken);
+            }
+
+            if (!includeAll)
+            {
+                keyPoints = keyPoints.Take(1).ToList();
+            }
         }
 
         return Ok(keyPoints);
@@ -211,12 +239,19 @@ public class ToursController : ControllerBase
 
         var currentUser = GetCurrentUserOrNull();
         var isOwner = currentUser is not null && currentUser.UserId == tour.AuthorId;
-        if (!isOwner && tour.Status != TourStatus.Published)
+        var isPurchasedTourist = false;
+        if (!isOwner && currentUser is not null && IsTourist())
+        {
+            var authHeader = Request.Headers.Authorization.ToString();
+            isPurchasedTourist = await _purchaseAccessService.HasPurchasedTourAsync(tourId, authHeader, cancellationToken);
+        }
+
+        if (!isOwner && !isPurchasedTourist && tour.Status != TourStatus.Published)
         {
             return NotFound("Tour not found.");
         }
 
-        if (!isOwner)
+        if (!isOwner && !isPurchasedTourist)
         {
             // Tourists must not see the rest of the route geometry.
             return Ok(new RoutePreviewDto());
@@ -516,6 +551,14 @@ public class ToursController : ControllerBase
     {
         _currentUserService.TryGetCurrentUser(User, out var currentUser);
         return currentUser;
+    }
+
+    private bool IsTourist()
+    {
+        return User.IsInRole("Tourist") ||
+               User.Claims.Any(c =>
+                   (c.Type == "role" || c.Type == "http://schemas.microsoft.com/ws/2008/06/identity/claims/role")
+                   && c.Value == "Tourist");
     }
 
     private ActionResult ToErrorResult(TourOperationException ex)

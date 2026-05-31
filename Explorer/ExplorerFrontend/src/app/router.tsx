@@ -10,6 +10,8 @@ import { TourDetailsPage } from '../pages/TourDetailsPage'
 import { SimulatorPage } from '../pages/SimulatorPage'
 import { ToursCatalogPage } from '../pages/ToursCatalogPage'
 import { ActiveTourPage } from '../pages/ActiveTourPage'
+import { CartPage } from '../pages/CartPage'
+import { PurchasedToursPage } from '../pages/PurchasedToursPage'
 
 export function AppRouter() {
   return (
@@ -67,6 +69,22 @@ export function AppRouter() {
               element={
                 <ProtectedRoute>
                   <ActiveTourPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/purchases/cart"
+              element={
+                <ProtectedRoute>
+                  <CartPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/purchases/tokens"
+              element={
+                <ProtectedRoute>
+                  <PurchasedToursPage />
                 </ProtectedRoute>
               }
             />

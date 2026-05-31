@@ -77,6 +77,7 @@ func main() {
 		mustRoute("/api/blogs", getEnv("BLOG_SERVICE_URL", "http://blog_service:8080")),
 		mustRoute("/api/followers", getEnv("FOLLOWER_SERVICE_URL", "http://follower_service:8080")),
 		mustRoute("/api/tours", tourServiceURL),
+		mustRoute("/api/purchases", getEnv("PURCHASE_SERVICE_URL", "http://purchase_service:8080")),
 	}
 
 	mux := http.NewServeMux()
@@ -226,10 +227,17 @@ func (g *gatewayHandler) startTourSaga(w http.ResponseWriter, r *http.Request, t
 	}
 
 	// ── Step 2: StakeholdersService — record active execution on tourist profile
-	// Non-critical: if this fails we log it but do NOT roll back the execution.
-	// TourService is the authoritative source of truth for execution state.
 	if err := g.setActiveTourOnProfile(r, execution.TouristId, execution.Id); err != nil {
-		log.Printf("SAGA StartTour step2 non-critical failure (executionId=%d): %v — continuing", execution.Id, err)
+		log.Printf("SAGA StartTour step2 failed (executionId=%d): %v", execution.Id, err)
+
+		if compErr := g.compensateCancelExecution(r, execution.Id); compErr != nil {
+			log.Printf("SAGA compensation failed (executionId=%d): %v", execution.Id, compErr)
+			writeJSONError(w, http.StatusBadGateway, "start tour failed and compensation did not succeed")
+			return
+		}
+
+		writeJSONError(w, http.StatusConflict, "start tour failed; execution rolled back")
+		return
 	}
 
 	// ── SAGA complete — return execution to client ────────────────────────────
@@ -345,12 +353,34 @@ func (g *gatewayHandler) callTourRPC(r *http.Request, method string, params map[
 		return nil, err
 	}
 
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed == "" {
+		return &jsonRPCResponse{
+			Error: &jsonRPCError{
+				Code:    resp.StatusCode,
+				Message: fmt.Sprintf("tour service returned empty response (status %d)", resp.StatusCode),
+			},
+		}, nil
+	}
+
 	var rpcResponse jsonRPCResponse
 	if err := json.Unmarshal(body, &rpcResponse); err != nil {
-		return nil, err
+		return &jsonRPCResponse{
+			Error: &jsonRPCError{
+				Code:    resp.StatusCode,
+				Message: fmt.Sprintf("tour service returned invalid JSON (status %d): %s", resp.StatusCode, truncateForLog(trimmed, 220)),
+			},
+		}, nil
 	}
 
 	return &rpcResponse, nil
+}
+
+func truncateForLog(value string, max int) string {
+	if len(value) <= max {
+		return value
+	}
+	return value[:max] + "..."
 }
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {

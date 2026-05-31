@@ -83,6 +83,25 @@ services:
       timeout: 5s
       retries: 10
 
+  purchase_db:
+    image: postgres:16-alpine
+    container_name: purchase_db
+    environment:
+      POSTGRES_DB: purchase_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5437:5432"
+    volumes:
+      - purchase_db_data:/var/lib/postgresql/data
+    networks:
+      - explorer_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mongodb:
     image: mongo:7
     container_name: mongodb
@@ -247,6 +266,7 @@ services:
       - MongoDb__ReviewsCollectionName=tour_reviews
       - MapRouting__BaseUrl=https://router.project-osrm.org
       - MapRouting__Profile=foot
+      - PurchaseService__BaseUrl=http://purchase_service:8080
       - Jwt__Key=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Development
@@ -257,6 +277,37 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
+    networks:
+      - explorer_network
+    restart: on-failure
+
+  purchase_service:
+    build:
+      context: ./PurchaseService
+      dockerfile: Dockerfile.purchase
+    container_name: purchase_service
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=http://localhost
+      - JWT_KEY=MCV28u9cqTXBqCTuEViK7NwF1BnSElJyl7SeTbngaZk
+      - TOUR_SERVICE_BASE_URL=http://tour_service:8080
+      - DB_CONNECTION=pgsql
+      - DB_HOST=purchase_db
+      - DB_PORT=5432
+      - DB_DATABASE=purchase_db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=root
+      - SESSION_DRIVER=file
+      - CACHE_STORE=file
+      - QUEUE_CONNECTION=sync
+    ports:
+      - "5006:8080"
+    depends_on:
+      purchase_db:
+        condition: service_healthy
+      tour_service:
+        condition: service_started
     networks:
       - explorer_network
     restart: on-failure
@@ -272,6 +323,7 @@ services:
       - BLOG_SERVICE_URL=http://blog_service:8080
       - FOLLOWER_SERVICE_URL=http://follower_service:8080
       - TOUR_SERVICE_URL=http://tour_service:8080
+      - PURCHASE_SERVICE_URL=http://purchase_service:8080
       - PORT=8080
       - INTERNAL_API_KEY=rkNyFb4xkrM1N3fiy7louwHeeo0V90PQ
     ports:
@@ -287,6 +339,8 @@ services:
         condition: service_started
       tour_service:
         condition: service_started
+      purchase_service:
+        condition: service_started
     networks:
       - explorer_network
     restart: on-failure
@@ -297,6 +351,7 @@ volumes:
   stakeholders_db_data:
   blog_db_data:
   tour_db_data:
+  purchase_db_data:
   mongodb_data:
   rabbitmq_data:
   neo4j_data:
