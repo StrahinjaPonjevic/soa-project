@@ -14,7 +14,10 @@ class AddToCartRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tourId' => ['required', 'integer', 'min:1'],
+            'tourId'     => ['required', 'integer', 'min:1'],
+            'tourName'   => ['required', 'string', 'max:255'],
+            'tourPrice'  => ['required', 'numeric', 'min:0'],
+            'tourStatus' => ['required', 'string'],
         ];
     }
 }

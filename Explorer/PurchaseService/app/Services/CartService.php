@@ -28,9 +28,10 @@ class CartService
         return $cart;
     }
 
-    public function addItem(int $touristId, int $tourId, string $authorization): ShoppingCart
+    public function addItem(int $touristId, int $tourId, string $tourName, float $tourPrice, string $tourStatus): ShoppingCart
     {
-        $snapshot = $this->tourCatalogClient->getTourSnapshot($tourId, $authorization);
+        $snapshot = ['id' => $tourId, 'name' => $tourName, 'price' => $tourPrice, 'status' => $tourStatus];
+
         if ($snapshot['status'] !== 'Published') {
             throw new PurchaseOperationException(409, 'Only published tours can be added to cart.');
         }

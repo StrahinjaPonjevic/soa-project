@@ -476,7 +476,7 @@ export function TourDetailsPage() {
       setPurchaseError(null)
       setPurchaseMessage(null)
       setAddingToCart(true)
-      await addToCart(tour.id)
+      await addToCart(tour.id, tour.name, tour.price, tour.status)
       setPurchaseMessage('Tour added to cart.')
     } catch (err) {
       setPurchaseError(getErrorMessage(err, 'Failed to add tour to cart.'))

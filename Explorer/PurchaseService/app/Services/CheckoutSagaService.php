@@ -29,15 +29,9 @@ class CheckoutSagaService
             throw new PurchaseOperationException(409, 'Cart is empty.');
         }
 
-        // SAGA step 1: Re-validate each tour against TourService.
-        foreach ($cart->items as $item) {
-            $snapshot = $this->tourCatalogClient->getTourSnapshot($item->tour_id, $authorization);
-            if ($snapshot['status'] !== 'Published') {
-                throw new PurchaseOperationException(
-                    409,
-                    "Tour {$item->tour_id} is no longer purchasable."
-                );
-            }
+        // SAGA step 1: Validate cart is not empty (tour data already stored at add-to-cart time).
+        if ($cart->items->isEmpty()) {
+            throw new PurchaseOperationException(409, 'Cart is empty.');
         }
 
         // SAGA step 2 + 3 (local transaction):

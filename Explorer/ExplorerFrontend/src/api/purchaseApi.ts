@@ -23,8 +23,13 @@ export async function getCart() {
   return response.data
 }
 
-export async function addToCart(tourId: number) {
-  const response = await tourHttpClient.post<CartResponse>('/api/purchases/cart/items', { tourId })
+export async function addToCart(tourId: number, tourName: string, tourPrice: number, tourStatus: string) {
+  const response = await tourHttpClient.post<CartResponse>('/api/purchases/cart/items', {
+    tourId,
+    tourName,
+    tourPrice,
+    tourStatus,
+  })
   return response.data
 }
 

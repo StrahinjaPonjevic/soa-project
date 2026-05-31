@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\RequestException;
 
@@ -18,10 +19,17 @@ class TourCatalogClient
     {
         $baseUrl = rtrim((string) config('services.tour_service.base_url'), '/');
 
-        $response = $this->http
-            ->withHeaders(['Authorization' => $authorization])
-            ->acceptJson()
-            ->get($baseUrl.'/api/tours/'.$tourId);
+        try {
+            $response = $this->http
+                ->timeout(8)
+                ->connectTimeout(3)
+                ->withOptions(['curl' => [CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4]])
+                ->withHeaders(['Authorization' => $authorization])
+                ->acceptJson()
+                ->get($baseUrl.'/api/tours/'.$tourId);
+        } catch (ConnectionException $e) {
+            throw new TourCatalogException(502, 'Tour service is unavailable.');
+        }
 
         if ($response->status() === 404) {
             throw new TourCatalogException(404, 'Tour not found.');

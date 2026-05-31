@@ -33,7 +33,9 @@ class CartController extends Controller
             $cart = $this->cartService->addItem(
                 $touristId,
                 (int) $request->input('tourId'),
-                (string) $request->header('Authorization')
+                (string) $request->input('tourName'),
+                (float) $request->input('tourPrice'),
+                (string) $request->input('tourStatus'),
             );
 
             return response()->json($this->toCartResponse($cart), 201);
