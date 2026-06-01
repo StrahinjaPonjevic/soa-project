@@ -188,6 +188,7 @@ export type CheckNearbyResponse = {
   keyPointId?: number | null
   keyPointName?: string | null
   isNewlyCompleted: boolean
+  allKeyPointsCompleted: boolean
   execution: TourExecutionResponse
 }
 

@@ -106,10 +106,17 @@ export function ActiveTourPage() {
         setNotification(`✓ Reached: ${result.keyPointName}`)
         setTimeout(() => setNotification(null), 5000)
       }
+
+      // Auto-complete when all key points are done
+      if (result.allKeyPointsCompleted) {
+        setNotification('🎉 All key points completed! Completing the tour...')
+        await completeTour(execId)
+        navigate('/tours', { state: { message: 'Tour completed!' } })
+      }
     } catch {
       // Silent — next tick will retry
     }
-  }, [execId])
+  }, [execId, navigate])
 
   useEffect(() => {
     if (!execution || execution.status !== 'Active') return
@@ -182,6 +189,8 @@ export function ActiveTourPage() {
   const completedIds = new Set(execution.completedKeyPoints.map((ckp) => ckp.keyPointId))
   const totalKp = keyPoints.length
   const doneKp = completedIds.size
+  // Sequential: next key point to reach (first uncompleted in order)
+  const nextKeyPoint = keyPoints.find((kp) => !completedIds.has(kp.id)) ?? null
 
   const mapCenter: [number, number] = myPosition
     ? [myPosition.lat, myPosition.lng]
@@ -234,26 +243,29 @@ export function ActiveTourPage() {
             </Marker>
           )}
 
-          {/* Key points — green if completed, orange if pending */}
-          {keyPoints.map((kp) => (
-            <Marker
-              key={kp.id}
-              position={[kp.latitude, kp.longitude]}
-              icon={completedIds.has(kp.id) ? greenIcon : orangeIcon}
-            >
-              <Popup>
-                <strong>{kp.name}</strong>
-                <br />
-                {kp.description}
-                <br />
-                {completedIds.has(kp.id) ? (
-                  <span style={{ color: 'green' }}>✓ Completed</span>
-                ) : (
-                  <span style={{ color: '#ea580c' }}>Pending</span>
-                )}
-              </Popup>
-            </Marker>
-          ))}
+          {/* Key points — green=completed, orange=next, grey=locked */}
+          {keyPoints.map((kp) => {
+            const done = completedIds.has(kp.id)
+            const isNext = nextKeyPoint?.id === kp.id
+            const icon = done ? greenIcon : isNext ? orangeIcon : makeIcon('grey' as any)
+            return (
+              <Marker key={kp.id} position={[kp.latitude, kp.longitude]} icon={icon}>
+                <Popup>
+                  <strong>{kp.name}</strong>
+                  <br />
+                  {kp.description}
+                  <br />
+                  {done ? (
+                    <span style={{ color: 'green' }}>✓ Completed</span>
+                  ) : isNext ? (
+                    <span style={{ color: '#ea580c' }}>▶ Next — head here!</span>
+                  ) : (
+                    <span style={{ color: '#999' }}>🔒 Locked</span>
+                  )}
+                </Popup>
+              </Marker>
+            )
+          })}
         </LeafletMapContainer>
       </div>
 
@@ -261,14 +273,16 @@ export function ActiveTourPage() {
         <button type="button" onClick={() => void runCheck()} style={{ background: 'var(--accent)' }}>
           Check Nearby Now
         </button>
-        <button
-          type="button"
-          onClick={handleComplete}
-          disabled={ending}
-          style={{ background: 'var(--success)' }}
-        >
-          Complete Tour
-        </button>
+        {doneKp === totalKp && totalKp > 0 && (
+          <button
+            type="button"
+            onClick={handleComplete}
+            disabled={ending}
+            style={{ background: 'var(--success)' }}
+          >
+            Complete Tour
+          </button>
+        )}
         <button
           type="button"
           onClick={handleAbandon}
@@ -285,16 +299,23 @@ export function ActiveTourPage() {
           <ul>
             {keyPoints.map((kp) => {
               const done = completedIds.has(kp.id)
+              const isNext = nextKeyPoint?.id === kp.id
               const ckp = execution.completedKeyPoints.find((c) => c.keyPointId === kp.id)
               return (
-                <li key={kp.id} className={`keypoint-item ${done ? 'keypoint-done' : ''}`}>
-                  <span className="keypoint-marker">{done ? '✓' : '○'}</span>
+                <li
+                  key={kp.id}
+                  className={`keypoint-item ${done ? 'keypoint-done' : ''} ${!done && !isNext ? 'keypoint-locked' : ''}`}
+                >
+                  <span className="keypoint-marker">
+                    {done ? '✓' : isNext ? '▶' : '🔒'}
+                  </span>
                   <span className="keypoint-name">{kp.name}</span>
                   {done && ckp && (
                     <span className="keypoint-time">
                       {new Date(ckp.completedAtUtc).toLocaleTimeString()}
                     </span>
                   )}
+                  {isNext && <span style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>head here!</span>}
                 </li>
               )
             })}

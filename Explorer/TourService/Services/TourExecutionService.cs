@@ -82,7 +82,7 @@ public class TourExecutionService : ITourExecutionService
         if (location is null)
         {
             await _context.SaveChangesAsync(ct);
-            return new CheckNearbyResult(false, null, null, false, execution);
+            return new CheckNearbyResult(false, null, null, false, false, execution);
         }
 
         var tour = await _context.Tours
@@ -92,23 +92,25 @@ public class TourExecutionService : ITourExecutionService
 
         var completedIds = execution.CompletedKeyPoints.Select(ckp => ckp.KeyPointId).ToHashSet();
 
-        KeyPoint? nearest = null;
-        double minDist = double.MaxValue;
+        // Sequential unlock: only check the next key point in order
+        var nextKeyPoint = tour!.KeyPoints
+            .OrderBy(kp => kp.OrderIndex)
+            .ThenBy(kp => kp.Id)
+            .FirstOrDefault(kp => !completedIds.Contains(kp.Id));
 
-        foreach (var kp in tour!.KeyPoints.Where(kp => !completedIds.Contains(kp.Id)))
+        KeyPoint? nearest = null;
+
+        if (nextKeyPoint is not null)
         {
-            var dist = HaversineKm(location.Latitude, location.Longitude, kp.Latitude, kp.Longitude);
-            if (dist < ProximityThresholdKm && dist < minDist)
-            {
-                minDist = dist;
-                nearest = kp;
-            }
+            var dist = HaversineKm(location.Latitude, location.Longitude, nextKeyPoint.Latitude, nextKeyPoint.Longitude);
+            if (dist < ProximityThresholdKm)
+                nearest = nextKeyPoint;
         }
 
         if (nearest is null)
         {
             await _context.SaveChangesAsync(ct);
-            return new CheckNearbyResult(false, null, null, false, execution);
+            return new CheckNearbyResult(false, null, null, false, false, execution);
         }
 
         var completed = new CompletedKeyPoint
@@ -120,7 +122,11 @@ public class TourExecutionService : ITourExecutionService
         _context.CompletedKeyPoints.Add(completed);
         await _context.SaveChangesAsync(ct);
 
-        return new CheckNearbyResult(true, nearest.Id, nearest.Name, true, execution);
+        // Reload updated completed count to check if all are done
+        var totalKeyPoints = tour.KeyPoints.Count;
+        var allDone = (completedIds.Count + 1) >= totalKeyPoints;
+
+        return new CheckNearbyResult(true, nearest.Id, nearest.Name, true, allDone, execution);
     }
 
     public async Task<TourExecution> CompleteAsync(int executionId, int touristId, CancellationToken ct)

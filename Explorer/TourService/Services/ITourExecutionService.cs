@@ -18,5 +18,6 @@ public sealed record CheckNearbyResult(
     int? KeyPointId,
     string? KeyPointName,
     bool IsNewlyCompleted,
+    bool AllKeyPointsCompleted,
     TourExecution Execution
 );

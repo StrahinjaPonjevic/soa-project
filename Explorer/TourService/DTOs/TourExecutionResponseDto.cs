@@ -27,5 +27,6 @@ public class CheckNearbyResponseDto
     public int? KeyPointId { get; set; }
     public string? KeyPointName { get; set; }
     public bool IsNewlyCompleted { get; set; }
+    public bool AllKeyPointsCompleted { get; set; }
     public TourExecutionResponseDto Execution { get; set; } = null!;
 }

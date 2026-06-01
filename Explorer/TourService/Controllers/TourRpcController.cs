@@ -140,6 +140,7 @@ public class TourRpcController : ControllerBase
             KeyPointId = result.KeyPointId,
             KeyPointName = result.KeyPointName,
             IsNewlyCompleted = result.IsNewlyCompleted,
+            AllKeyPointsCompleted = result.AllKeyPointsCompleted,
             Execution = ToExecutionDto(result.Execution)
         };
     }
