@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
 import { addComment, getBlog, likeBlog, unlikeBlog, updateComment } from '../api/blogApi'
 import { followUser, isFollowing, unfollowUser } from '../api/followerApi'
 import type { BlogResponse } from '../shared/types/blog'
@@ -155,7 +156,9 @@ export function BlogDetailsPage() {
 
         {canRead ? (
           <>
-            <p className="blog-content">{blog.descriptionMarkdown}</p>
+            <div className="blog-content">
+              <ReactMarkdown>{blog.descriptionMarkdown}</ReactMarkdown>
+            </div>
             {blog.imageUrls && blog.imageUrls.length > 0 && (
               <div className="blog-images">
                 {blog.imageUrls.map((url) => (
@@ -208,7 +211,8 @@ export function BlogDetailsPage() {
                     <strong>{comment.authorUsername}</strong>
                     <span className="comment-date">
                       {new Date(comment.createdAtUtc).toLocaleString()}
-                      {comment.updatedAtUtc !== comment.createdAtUtc && ' (edited)'}
+                      {comment.updatedAtUtc !== comment.createdAtUtc &&
+                        ` · edited ${new Date(comment.updatedAtUtc).toLocaleString()}`}
                     </span>
                   </div>
                   {editingCommentId === comment.id ? (

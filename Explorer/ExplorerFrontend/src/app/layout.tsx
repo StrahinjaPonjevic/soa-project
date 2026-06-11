@@ -20,6 +20,10 @@ export function AppLayout() {
           {isAuthenticated && <Link to="/feed">My Feed</Link>}
           {isAuthenticated && <Link to="/blogs">Blogs</Link>}
           {isAuthenticated && <Link to="/explorers">Explorers</Link>}
+          {(authUser.role === 'Guide' || authUser.role === 'Tourist') && (
+            <Link to="/profile">My Profile</Link>
+          )}
+          {authUser.role === 'Admin' && <Link to="/admin/users">Users</Link>}
           {authUser.role === 'Guide' && <Link to="/tours/me">My Tours</Link>}
           {authUser.role === 'Guide' && <Link to="/tours/new">Create Tour</Link>}
           {authUser.role === 'Tourist' && <Link to="/purchases/cart">Cart</Link>}

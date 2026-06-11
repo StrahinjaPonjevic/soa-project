@@ -17,6 +17,8 @@ import { BlogsPage } from '../pages/BlogsPage'
 import { BlogDetailsPage } from '../pages/BlogDetailsPage'
 import { CreateBlogPage } from '../pages/CreateBlogPage'
 import { ExplorersPage } from '../pages/ExplorersPage'
+import { MyProfilePage } from '../pages/MyProfilePage'
+import { AdminUsersPage } from '../pages/AdminUsersPage'
 
 export function AppRouter() {
   return (
@@ -114,6 +116,22 @@ export function AppRouter() {
               element={
                 <ProtectedRoute>
                   <ExplorersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <MyProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <AdminUsersPage />
                 </ProtectedRoute>
               }
             />

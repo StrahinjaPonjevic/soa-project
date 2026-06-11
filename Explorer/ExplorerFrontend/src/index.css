@@ -831,3 +831,99 @@ a.blog-card-title:hover {
 .comment-form {
   margin-top: 0.5rem;
 }
+
+/* ── Profile ──────────────────────────────────────────────────────────────── */
+
+.profile-view {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+.profile-view h2 {
+  margin: 0 0 0.35rem;
+}
+
+.profile-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.profile-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--nav-bg);
+}
+
+.profile-motto {
+  margin: 0 0 0.6rem;
+  font-style: italic;
+  color: #ba4a1d;
+}
+
+.profile-bio {
+  margin: 0;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* ── Admin users table ────────────────────────────────────────────────────── */
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table th,
+.users-table td {
+  text-align: left;
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid #f1dfd1;
+}
+
+.users-table th {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.users-table tr:last-child td {
+  border-bottom: none;
+}
+
+.users-table-actions {
+  text-align: right;
+}
+
+.users-table-actions button {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.88rem;
+}
+
+.status-active {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.status-blocked {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .profile-view {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}
