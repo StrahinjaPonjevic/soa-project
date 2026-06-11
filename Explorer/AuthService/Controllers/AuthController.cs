@@ -65,6 +65,19 @@ public class AuthController : ControllerBase
         return Ok(new { token });
     }
 
+    // Lista profila (id + username) dostupna svim ulogovanim korisnicima —
+    // front je koristi za prikaz profila za praćenje (follower servis barata samo ID-jevima)
+    [Authorize]
+    [HttpGet("users/public")]
+    public IActionResult GetPublicUsers()
+    {
+        var users = _context.Users
+            .Where(u => !u.IsBlocked && (u.Role == "Guide" || u.Role == "Tourist"))
+            .Select(u => new { u.Id, u.Username, u.Role })
+            .ToList();
+        return Ok(users);
+    }
+
     [Authorize(Roles = "Admin")]
     [HttpGet("users")]
     public IActionResult GetUsers()

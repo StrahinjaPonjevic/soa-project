@@ -12,6 +12,11 @@ import { ToursCatalogPage } from '../pages/ToursCatalogPage'
 import { ActiveTourPage } from '../pages/ActiveTourPage'
 import { CartPage } from '../pages/CartPage'
 import { PurchasedToursPage } from '../pages/PurchasedToursPage'
+import { FeedPage } from '../pages/FeedPage'
+import { BlogsPage } from '../pages/BlogsPage'
+import { BlogDetailsPage } from '../pages/BlogDetailsPage'
+import { CreateBlogPage } from '../pages/CreateBlogPage'
+import { ExplorersPage } from '../pages/ExplorersPage'
 
 export function AppRouter() {
   return (
@@ -69,6 +74,46 @@ export function AppRouter() {
               element={
                 <ProtectedRoute>
                   <ActiveTourPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/feed"
+              element={
+                <ProtectedRoute>
+                  <FeedPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/blogs"
+              element={
+                <ProtectedRoute>
+                  <BlogsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/blogs/new"
+              element={
+                <ProtectedRoute>
+                  <CreateBlogPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/blogs/:id"
+              element={
+                <ProtectedRoute>
+                  <BlogDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/explorers"
+              element={
+                <ProtectedRoute>
+                  <ExplorersPage />
                 </ProtectedRoute>
               }
             />

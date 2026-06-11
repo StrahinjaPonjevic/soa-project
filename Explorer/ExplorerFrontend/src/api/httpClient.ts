@@ -18,3 +18,6 @@ tourHttpClient.interceptors.request.use((config) => {
 
   return config
 })
+
+// Generic authorized client (blogs, followers, users) — same gateway, JWT attached
+export const apiHttpClient = tourHttpClient
