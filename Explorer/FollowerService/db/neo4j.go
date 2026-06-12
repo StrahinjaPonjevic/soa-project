@@ -5,6 +5,9 @@ import (
 	"log"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var Driver neo4j.DriverWithContext
@@ -21,8 +24,15 @@ func Init(uri, user, password string) {
 	log.Println("Connected to Neo4j")
 }
 
-func QueryIDs(cypher string, params map[string]any) ([]int, error) {
-	ctx := context.Background()
+func QueryIDs(ctx context.Context, cypher string, params map[string]any) ([]int, error) {
+	// Subspan za upit ka Neo4j bazi — vidi se kao zaseban segment u trace-u
+	ctx, span := otel.Tracer("follower-service").Start(ctx, "neo4j.query")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("db.system", "neo4j"),
+		attribute.String("db.statement", cypher),
+	)
+
 	session := Driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -39,6 +49,8 @@ func QueryIDs(cypher string, params map[string]any) ([]int, error) {
 		return ids, nil
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	ids, _ := result.([]int)

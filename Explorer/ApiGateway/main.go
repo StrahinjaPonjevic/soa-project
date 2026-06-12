@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type route struct {
@@ -62,12 +67,21 @@ func main() {
 	stakeholdersServiceURL := getEnv("STAKEHOLDERS_SERVICE_URL", "http://stakeholders_service:8080")
 	internalApiKey := getEnv("INTERNAL_API_KEY", "internal-secret")
 
+	tp, err := initTracer("api-gateway")
+	if err != nil {
+		log.Fatalf("Failed to initialize tracer: %v", err)
+	}
+	defer func() { _ = tp.Shutdown(context.Background()) }()
+
 	gw := &gatewayHandler{
 		tourServiceURL:         strings.TrimRight(tourServiceURL, "/"),
 		stakeholdersServiceURL: strings.TrimRight(stakeholdersServiceURL, "/"),
 		internalApiKey:         internalApiKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			// OTel transport: RPC i SAGA pozivi ka servisima se beleze kao
+			// client spanovi i propagiraju trace context
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 
@@ -113,8 +127,15 @@ func main() {
 		http.NotFound(w, r)
 	})
 
+	// Server span za svaki zahtev koji prodje kroz gateway; ime spana je metoda + putanja
+	tracedMux := otelhttp.NewHandler(mux, "api-gateway",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			return r.Method + " " + r.URL.Path
+		}),
+	)
+
 	log.Printf("API gateway listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, tracedMux); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -402,6 +423,9 @@ func mustRoute(prefix, rawTarget string) route {
 		req.Host = target.Host
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Set("X-Forwarded-Proto", "http")
+		// Upisuje traceparent heder u prosledjeni zahtev — downstream servis
+		// (npr. follower servis) nastavlja isti trace umesto da pocne novi
+		otel.GetTextMapPropagator().Inject(req.Context(), propagation.HeaderCarrier(req.Header))
 	}
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		resp.Header.Set("Access-Control-Allow-Origin", "http://localhost:5173")

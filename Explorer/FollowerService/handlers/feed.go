@@ -8,6 +8,9 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type BlogResponse struct {
@@ -21,15 +24,27 @@ type BlogResponse struct {
 	LikesCount          int      `json:"likesCount"`
 }
 
+// HTTP klijent sa OTel transportom — poziv ka blog servisu se belezi kao
+// client span i propagira trace context kroz hedere
+var tracedHTTPClient = http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+
 // GET /api/followers/feed
 func GetFeed(c *gin.Context) {
 	userID := c.GetInt("userId")
 
-	followingIDs, err := db.QueryIDs(
+	// Parent span za celu feed operaciju; c.Request.Context() nosi span
+	// koji je kreirao otelgin middleware
+	ctx, span := otel.Tracer("follower-service").Start(c.Request.Context(), "get-feed")
+	defer span.End()
+
+	span.AddEvent("Querying Neo4j for followed users")
+	followingIDs, err := db.QueryIDs(ctx,
 		`MATCH (a:User {id: $userId})-[:FOLLOWS]->(b:User) RETURN b.id AS id`,
 		map[string]any{"userId": userID},
 	)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -43,8 +58,18 @@ func GetFeed(c *gin.Context) {
 		blogServiceURL = "http://blog_service:8080"
 	}
 
-	resp, err := http.Get(blogServiceURL + "/api/blogs")
+	span.AddEvent("Fetching blogs from blog service")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, blogServiceURL+"/api/blogs", nil)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot build blog request"})
+		return
+	}
+	resp, err := tracedHTTPClient.Do(req)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot reach blog service"})
 		return
 	}
@@ -52,12 +77,16 @@ func GetFeed(c *gin.Context) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read blog response"})
 		return
 	}
 
 	var allBlogs []BlogResponse
 	if err := json.Unmarshal(body, &allBlogs); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse blogs"})
 		return
 	}

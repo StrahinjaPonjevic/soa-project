@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"context"
 	"follower-service/db"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type RecommendationResult struct {
@@ -22,7 +23,7 @@ func GetFollowing(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid userId"})
 		return
 	}
-	ids, err := db.QueryIDs(
+	ids, err := db.QueryIDs(c.Request.Context(),
 		`MATCH (a:User {id: $userId})-[:FOLLOWS]->(b:User) RETURN b.id AS id`,
 		map[string]any{"userId": userID},
 	)
@@ -40,7 +41,7 @@ func GetFollowers(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid userId"})
 		return
 	}
-	ids, err := db.QueryIDs(
+	ids, err := db.QueryIDs(c.Request.Context(),
 		`MATCH (a:User)-[:FOLLOWS]->(b:User {id: $userId}) RETURN a.id AS id`,
 		map[string]any{"userId": userID},
 	)
@@ -60,7 +61,9 @@ func IsFollowing(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, span := otel.Tracer("follower-service").Start(c.Request.Context(), "neo4j.is-following")
+	defer span.End()
+
 	session := db.Driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -79,6 +82,8 @@ func IsFollowing(c *gin.Context) {
 		return false, nil
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -93,7 +98,9 @@ func GetRecommendations(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, span := otel.Tracer("follower-service").Start(c.Request.Context(), "neo4j.recommendations")
+	defer span.End()
+
 	session := db.Driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -120,6 +127,8 @@ func GetRecommendations(c *gin.Context) {
 		return recs, nil
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

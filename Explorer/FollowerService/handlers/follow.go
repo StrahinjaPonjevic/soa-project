@@ -1,12 +1,13 @@
 package handlers
 
 import (
-	"context"
 	"follower-service/db"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type FollowRequest struct {
@@ -27,7 +28,9 @@ func Follow(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, span := otel.Tracer("follower-service").Start(c.Request.Context(), "neo4j.create-follow")
+	defer span.End()
+
 	session := db.Driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -40,6 +43,8 @@ func Follow(c *gin.Context) {
 		return nil, err
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -56,7 +61,9 @@ func Unfollow(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx, span := otel.Tracer("follower-service").Start(c.Request.Context(), "neo4j.delete-follow")
+	defer span.End()
+
 	session := db.Driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -67,6 +74,8 @@ func Unfollow(c *gin.Context) {
 		return nil, err
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

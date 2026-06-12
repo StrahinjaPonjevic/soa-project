@@ -1,0 +1,34 @@
+# Tracing overlay — pokrece se zajedno sa osnovnim compose fajlom:
+#   docker compose -f docker-compose.yml -f docker-compose.tracing.yml up -d --build
+# (moze i u kombinaciji sa monitoring overlay-em kolege)
+#
+# Jaeger prima trace-ove preko OTLP protokola (port 4318), UI je na http://localhost:16686
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.58
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP — servisi salju trace-ove ovde
+    networks:
+      - explorer_network
+    restart: unless-stopped
+
+  # Postojecim servisima se samo dodaje env varijabla — kada je JAEGER_ENDPOINT
+  # postavljen, salju trace-ove Jaeger-u; bez nje pisu u traces.json (kao u lekciji)
+  api_gateway:
+    environment:
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    depends_on:
+      jaeger:
+        condition: service_started
+
+  follower_service:
+    environment:
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
+    depends_on:
+      jaeger:
+        condition: service_started
