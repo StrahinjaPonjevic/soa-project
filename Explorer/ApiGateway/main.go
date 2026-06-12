@@ -26,6 +26,16 @@ type route struct {
 	proxy  *httputil.ReverseProxy
 }
 
+type statusRecordingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusRecordingResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
 type gatewayHandler struct {
 	tourServiceURL         string
 	stakeholdersServiceURL string
@@ -135,9 +145,30 @@ func main() {
 	)
 
 	log.Printf("API gateway listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, tracedMux); err != nil {
+	if err := http.ListenAndServe(":"+port, loggingMiddleware(tracedMux)); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		recorder := &statusRecordingResponseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+		}
+
+		next.ServeHTTP(recorder, r)
+
+		log.Printf(
+			"request method=%s path=%s status=%d duration_ms=%d remote_addr=%s",
+			r.Method,
+			r.URL.Path,
+			recorder.statusCode,
+			time.Since(start).Milliseconds(),
+			r.RemoteAddr,
+		)
+	})
 }
 
 // tryHandleTourRPC intercepts POST requests that map to JSON-RPC methods.
